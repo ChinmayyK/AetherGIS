@@ -2,21 +2,41 @@
     email {$CADDY_EMAIL:tejasbhor406@gmail.com}
 }
 
-# --- Combined Access (Domain + IP) ---
-# This block handles the IP address and any domains pointing to it
-{$AETHERGIS_DOMAIN}, aethergis.civiclens.space, http://129.213.145.9, http://localhost, :80 {
+# --- Production Domain (HTTPS) ---
+aethergis.civiclens.space {
     # Frontend
     reverse_proxy aethergis-frontend:80
 
     # Backend API
     handle /api/v1/* {
-        reverse_proxy aethergis-backend:8000
+        reverse_proxy aethergis-backend:8000 {
+            header_up Host {host}
+            header_up X-Real-IP {remote_host}
+            header_up X-Forwarded-For {remote_host}
+            header_up X-Forwarded-Proto {scheme}
+        }
     }
 
     # Security Headers
     header {
         X-Content-Type-Options nosniff
         X-Frame-Options DENY
-        Referrer-Policy strict-origin-when-cross-origin
+        Referrer-Policy no-referrer-when-downgrade
+        Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
     }
+
+    # Handle WebSockets for potential streaming
+    handle /api/v1/jobs/*/stream {
+        reverse_proxy aethergis-backend:8000 {
+            header_up Host {host}
+            header_up X-Real-IP {remote_host}
+            header_up X-Forwarded-Proto {scheme}
+        }
+    }
+}
+
+# --- HTTP / IP Fallback ---
+http://129.213.145.9, http://localhost, :80 {
+    # Redirect to HTTPS if accessed via IP
+    redir https://aethergis.civiclens.space{uri}
 }

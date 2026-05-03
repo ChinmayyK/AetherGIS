@@ -234,7 +234,11 @@ export default function MapViewer() {
             maxZoom: 8,
             attributions: 'NASA GIBS / Blue Marble'
           })
-        : new OSM()
+        : new XYZ({
+            url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+            attributions: '© OpenStreetMap contributors',
+            crossOrigin: 'anonymous'
+          })
     });
     baseLayerRef.current = baseLayer;
 
@@ -304,7 +308,11 @@ export default function MapViewer() {
           maxZoom: 8,
           attributions: 'NASA GIBS / Blue Marble'
         })
-      : new OSM();
+        : new XYZ({
+            url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+            attributions: '© OpenStreetMap contributors',
+            crossOrigin: 'anonymous'
+          });
     
     baseLayer.setSource(newSource);
   }, [baseLayerType]);

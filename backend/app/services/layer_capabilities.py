@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 import time
+import asyncio
 import defusedxml.ElementTree as ET
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
@@ -16,11 +17,31 @@ from backend.app.utils.logging import get_logger
 logger = get_logger(__name__)
 settings = get_settings()
 
-_CAPS_TTL_SECONDS = 30 * 60
+_CAPS_TTL_SECONDS = 120 * 60 # 2 hours for production stability
 _WMS_XML_CACHE: tuple[float, ET.Element] | None = None
 _MOSDAC_XML_CACHE: tuple[float, ET.Element] | None = None
 _DESCRIBE_DOMAINS_CACHE: dict[str, tuple[float, ET.Element]] = {}
 _LAYER_CACHE: dict[str, tuple[float, 'ParsedLayerCapabilities']] = {}
+
+async def _fetch_with_retry(url: str, params: dict, client: httpx.AsyncClient, retries: int = 3) -> httpx.Response:
+    """Helper to fetch XML with exponential backoff on 429 or 5xx errors."""
+    for i in range(retries):
+        try:
+            headers = {"User-Agent": "AetherGIS/2.0 (Production GeoAI Platform; tejasbhor406@gmail.com)"}
+            response = await client.get(url, params=params, headers=headers)
+            if response.status_code == 429:
+                wait = (i + 1) * 2
+                logger.warning("Rate limit hit (429). Retrying...", url=url, wait=wait)
+                await asyncio.sleep(wait)
+                continue
+            response.raise_for_status()
+            return response
+        except httpx.HTTPStatusError as e:
+            if i == retries - 1: raise
+            wait = (i + 1) * 2
+            logger.warning("HTTP error. Retrying...", status=e.response.status_code, wait=wait)
+            await asyncio.sleep(wait)
+    raise httpx.HTTPError("Max retries exceeded")
 
 # INSAT-3D launched Feb 2014; INSAT-3DR launched Sep 2016
 _INSAT3D_EPOCH  = datetime(2014, 2, 15, tzinfo=timezone.utc)
@@ -87,8 +108,7 @@ async def _get_wms_capabilities_root() -> ET.Element:
 
     params = {'SERVICE': 'WMS', 'REQUEST': 'GetCapabilities', 'VERSION': '1.1.1'}
     async with httpx.AsyncClient(timeout=settings.wms_timeout_seconds, follow_redirects=True) as client:
-        response = await client.get(settings.nasa_gibs_base_url, params=params)
-        response.raise_for_status()
+        response = await _fetch_with_retry(settings.nasa_gibs_base_url, params, client)
         root = ET.fromstring(response.text)
 
     _WMS_XML_CACHE = (now, root)
@@ -96,15 +116,6 @@ async def _get_wms_capabilities_root() -> ET.Element:
 
 
 async def _get_mosdac_capabilities_root() -> ET.Element:
-    """
-    Fetch and cache MOSDAC WMS GetCapabilities XML.
-
-    MOSDAC endpoint: https://mosdac.gov.in/live/wms?SERVICE=WMS&REQUEST=GetCapabilities
-    Each INSAT-3D/3DR layer advertises its time extent in a <Extent name="time">
-    or <Dimension name="time"> element, parsed exactly the same way as GIBS.
-
-    Cache TTL mirrors the GIBS TTL (30 min) — MOSDAC updates composites every 30 min.
-    """
     global _MOSDAC_XML_CACHE
     now = time.time()
     if _MOSDAC_XML_CACHE and now - _MOSDAC_XML_CACHE[0] < _CAPS_TTL_SECONDS:
@@ -119,8 +130,7 @@ async def _get_mosdac_capabilities_root() -> ET.Element:
         params['key'] = settings.mosdac_api_key
 
     async with httpx.AsyncClient(timeout=settings.wms_timeout_seconds, follow_redirects=True) as client:
-        response = await client.get(settings.mosdac_wms_url, params=params)
-        response.raise_for_status()
+        response = await _fetch_with_retry(settings.mosdac_wms_url, params, client)
         root = ET.fromstring(response.text)
 
     _MOSDAC_XML_CACHE = (now, root)
