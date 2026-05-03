@@ -16,9 +16,9 @@ settings = get_settings()
 logger = get_logger(__name__)
 
 # Rate limit config
-RATE_LIMIT_REQUESTS = getattr(settings, "rate_limit_requests_per_minute", 600)
+RATE_LIMIT_REQUESTS = getattr(settings, "rate_limit_requests_per_minute", 1000)
 RATE_LIMIT_WINDOW_SECONDS = 60
-RATE_LIMIT_BURST = 50
+RATE_LIMIT_BURST = 200 # Allow more concurrent telemetry requests
 MAX_BODY_SIZE_MB = 50
 
 # Paths that bypass rate limiting
@@ -34,6 +34,8 @@ RATE_LIMIT_EXEMPT_EXACT = {
 RATE_LIMIT_EXEMPT_CONTAINS = {
     "/frames/",
     "/video/",
+    "/pipeline/",
+    "/archive/",
 }
 
 # Paths that require API key or Session
@@ -205,16 +207,18 @@ class SecurityMiddleware(BaseHTTPMiddleware):
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["X-Frame-Options"] = "DENY"
         response.headers["X-XSS-Protection"] = "1; mode=block"
-        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        response.headers["Referrer-Policy"] = "no-referrer-when-downgrade"
         response.headers["X-RateLimit-Limit"] = str(RATE_LIMIT_REQUESTS)
 
         if settings.aether_mode == 'production':
             response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains; preload"
+            # Allow OSM and common basemap providers
             response.headers["Content-Security-Policy"] = (
                 "default-src 'self'; "
-                "img-src 'self' data: https://*.nasa.gov https://*.gov.in https://*.jaxa.jp; "
+                "img-src 'self' data: blob: https://*.nasa.gov https://*.gov.in https://*.jaxa.jp https://*.openstreetmap.org https://*.tile.openstreetmap.org https://*.basemaps.cartocdn.com; "
                 "script-src 'self' 'unsafe-inline'; "
                 "style-src 'self' 'unsafe-inline'; "
+                "connect-src 'self' https://*.nasa.gov; "
             )
 
         return response
