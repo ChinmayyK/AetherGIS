@@ -449,7 +449,7 @@ async def stream_frames(job_id: str, request: Request, current_user_id: str = De
 # â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 @system_router.get("/config")
-async def get_system_config(current_user_id: str = Depends(resolve_current_user_id)) -> dict:
+async def get_system_config() -> dict:
     """Expose system configuration mode for frontend adaptation."""
     return {
         "mode": settings.aether_mode,
