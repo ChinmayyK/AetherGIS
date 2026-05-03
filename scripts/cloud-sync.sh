@@ -64,5 +64,5 @@ done
 echo " ✅"
 
 echo -e "${GREEN}✨ UPDATE COMPLETE! AetherGIS is live.${NC}"
-echo -e "Access the portal at: ${YELLOW}http://aethergis.civiclens.space${NC}"
+echo -e "Access the portal at: ${YELLOW}https://aethergis.civiclens.space${NC}"
 echo -e "Monitor live logs with: ${YELLOW}sudo docker compose logs -f backend${NC}"
