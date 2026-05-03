@@ -12,13 +12,14 @@ from sqlalchemy.orm import Session
 
 from backend.app.config import get_settings
 from backend.app.db import engine, session_scope
-from backend.app.models.db_models import ArtifactRecord, Base, RunRecord, SessionRecord
+from backend.app.models.db_models import ArtifactRecord, Base, RunRecord, SessionRecord, UserRecord
 from backend.app.utils.logging import get_logger
 
 settings = get_settings()
 logger = get_logger(__name__)
 
 DEMO_SESSION_ID = "00000000-0000-0000-0000-000000000001"
+DEMO_USER_ID = "00000000-0000-0000-0000-000000000000"
 
 
 def init_database() -> None:
@@ -61,10 +62,22 @@ def _can_access_owner(record_user_id: str | None, requested_user_id: str | None)
 
 def ensure_demo_session(provider_default: str = "nasa_gibs", name: str = "Demo Workspace") -> SessionRecord:
     with session_scope() as db:
+        user = db.get(UserRecord, DEMO_USER_ID)
+        if user is None:
+            user = UserRecord(
+                id=DEMO_USER_ID,
+                email="demo@aethergis.com",
+                display_name="System Guest",
+                role="demo"
+            )
+            db.add(user)
+            db.flush()
+
         session = db.get(SessionRecord, DEMO_SESSION_ID)
         if session is None:
             session = SessionRecord(
                 id=DEMO_SESSION_ID,
+                user_id=DEMO_USER_ID,
                 name=name,
                 provider_default=provider_default,
             )
@@ -76,6 +89,30 @@ def ensure_demo_session(provider_default: str = "nasa_gibs", name: str = "Demo W
             db.add(session)
             db.flush()
         return session
+
+
+def ensure_user(user_id: str, email: str | None = None, name: str | None = None) -> UserRecord:
+    """Ensure a user record exists in the database."""
+    with session_scope() as db:
+        user = db.get(UserRecord, user_id)
+        if user is None:
+            user = UserRecord(
+                id=user_id,
+                email=email,
+                display_name=name,
+                role="demo"
+            )
+            db.add(user)
+            db.flush()
+        else:
+            # Update info if changed
+            if email and user.email != email:
+                user.email = email
+            if name and user.display_name != name:
+                user.display_name = name
+            db.add(user)
+            db.flush()
+        return user
 
 
 def create_session(name: str, provider_default: str = "nasa_gibs", user_id: str | None = None) -> dict[str, Any]:
@@ -196,9 +233,11 @@ def create_run(
                     provider_default=payload.get("data_source", "nasa_gibs"),
                     session_name=session_name,
                 )
+                effective_user_id = user_id
             else:
                 target_session_id = DEMO_SESSION_ID
                 ensure_demo_session(provider_default=payload.get("data_source", "nasa_gibs"), name=session_name or "Demo Workspace")
+                effective_user_id = DEMO_USER_ID
 
         session_record = db.get(SessionRecord, target_session_id)
         if session_record is None:
@@ -213,7 +252,7 @@ def create_run(
             run = RunRecord(
                 id=job_id,
                 session_id=target_session_id,
-                user_id=user_id,
+                user_id=effective_user_id,
                 provider=payload.get("data_source", "nasa_gibs"),
                 status="QUEUED",
                 priority=priority,

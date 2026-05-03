@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import time
-import xml.etree.ElementTree as ET
+import defusedxml.ElementTree as ET
 from typing import Any
 
 import httpx

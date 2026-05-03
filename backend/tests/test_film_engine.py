@@ -1,6 +1,5 @@
 import pytest
 import numpy as np
-import torch
 from backend.app.services.interpolation import FILMEngine
 
 def test_film_engine_interpolation():

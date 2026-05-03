@@ -11,7 +11,7 @@
  * It fires useEffect whenever the relevant store toggles change.
  * Safe: gracefully no-ops if map isn't ready.
  */
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useCallback } from 'react';
 import { useStore } from '@app/store/useStore';
 import {
   fetchTrajectories,
@@ -42,100 +42,15 @@ export default function MapOverlayManager() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const containerRef = useRef<HTMLElement | null>(null);
 
-  // ── Resolve or create overlay canvas inside the OL map container ──────────
-  useEffect(() => {
-    const handler = (e: Event) => {
-      const mapEl: HTMLElement | null = (e as CustomEvent).detail?.mapEl ?? null;
-      if (!mapEl) return;
-      // Create persistent overlay canvas
-      let canvas = mapEl.querySelector<HTMLCanvasElement>('.aether-overlay-canvas');
-      if (!canvas) {
-        canvas = document.createElement('canvas');
-        canvas.className = 'aether-overlay-canvas';
-        canvas.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:200;';
-        mapEl.style.position = 'relative';
-        mapEl.appendChild(canvas);
-      }
-      canvasRef.current = canvas;
-      containerRef.current = mapEl;
-      resizeCanvas();
-    };
-    window.addEventListener('aethergis:mapReady', handler);
-    return () => window.removeEventListener('aethergis:mapReady', handler);
-  }, []);
-
-  function resizeCanvas() {
+  const resizeCanvas = useCallback(() => {
     const canvas = canvasRef.current;
     const container = containerRef.current;
     if (!canvas || !container) return;
     canvas.width = container.clientWidth;
     canvas.height = container.clientHeight;
-  }
+  }, []);
 
-  // ── Fetch trajectories when toggle turns ON ───────────────────────────────
-  useEffect(() => {
-    if (!jobId || !pipelineResult) return;
-    if (!showTrajectories) return;
-    if (trajectories !== null) { renderAll(); return; }
-    setLoadingTrajectories(true);
-    fetchTrajectories(jobId)
-      .then((data) => setTrajectories(data?.trajectories ?? []))
-      .catch(() => setTrajectories([]))
-      .finally(() => setLoadingTrajectories(false));
-  }, [showTrajectories, jobId, pipelineResult]);
-
-  // ── Fetch alerts when anomaly toggle turns ON ─────────────────────────────
-  useEffect(() => {
-    if (!jobId || !pipelineResult) return;
-    if (!showAnomalies) return;
-    if (alerts !== null) { renderAll(); return; }
-    setLoadingAlerts(true);
-    fetchAlerts(jobId)
-      .then((data) => setAlerts(data?.alerts ?? []))
-      .catch(() => setAlerts([]))
-      .finally(() => setLoadingAlerts(false));
-  }, [showAnomalies, jobId, pipelineResult]);
-
-  // ── Fetch uncertainty heatmap ─────────────────────────────────────────────
-  useEffect(() => {
-    if (!jobId || !pipelineResult || !showUncertaintyMap) return;
-    if (heatmaps['uncertainty']) { renderAll(); return; }
-    setLoadingHeatmap('uncertainty', true);
-    fetchHeatmap(jobId, 'uncertainty')
-      .then((data) => setHeatmap('uncertainty', data))
-      .catch(() => {})
-      .finally(() => setLoadingHeatmap('uncertainty', false));
-  }, [showUncertaintyMap, jobId, pipelineResult]);
-
-  // ── Fetch motion heatmap ──────────────────────────────────────────────────
-  useEffect(() => {
-    if (!jobId || !pipelineResult || !showChangeMap) return;
-    if (heatmaps['motion']) { renderAll(); return; }
-    setLoadingHeatmap('motion', true);
-    fetchHeatmap(jobId, 'motion')
-      .then((data) => setHeatmap('motion', data))
-      .catch(() => {})
-      .finally(() => setLoadingHeatmap('motion', false));
-  }, [showChangeMap, jobId, pipelineResult]);
-
-  // ── Fetch explainability for current frame ────────────────────────────────
-  useEffect(() => {
-    if (!jobId || !pipelineResult || !showExplainability) return;
-    const frames = pipelineResult.frames ?? [];
-    const f = frames[currentFrameIndex];
-    if (!f?.is_interpolated) return;
-    fetchExplanation(jobId, currentFrameIndex)
-      .then(setExplanation)
-      .catch(() => {});
-  }, [showExplainability, jobId, pipelineResult, currentFrameIndex]);
-
-  // ── Re-render canvas whenever relevant state changes ─────────────────────
-  useEffect(() => { renderAll(); }, [
-    showTrajectories, showAnomalies, showUncertaintyMap, showChangeMap, showExplainability,
-    trajectories, alerts, heatmaps, explanation, overlayOpacity, currentFrameIndex,
-  ]);
-
-  function renderAll() {
+  const renderAll = useCallback(() => {
     const canvas = canvasRef.current;
     const container = containerRef.current;
     if (!canvas || !container) return;
@@ -241,19 +156,107 @@ export default function MapOverlayManager() {
         ctx.drawImage(img, 0, 0, W, H);
         ctx.globalAlpha = 1;
         // Draw uncertainty regions as dashed rectangles
-        if (explanation.uncertainty_regions?.length > 0) {
+        if (explanation.uncertainty_regions && explanation.uncertainty_regions.length > 0) {
           ctx.strokeStyle = '#f87171';
           ctx.lineWidth = 1.5;
           ctx.setLineDash([3, 3]);
           explanation.uncertainty_regions.slice(0, 5).forEach(r => {
-            ctx.strokeRect(r.bbox[0] * W, r.bbox[1] * H, (r.bbox[2] - r.bbox[0]) * W, (r.bbox[3] - r.bbox[1]) * H);
+            if (r.bbox) {
+              ctx.strokeRect(r.bbox[0] * W, r.bbox[1] * H, (r.bbox[2] - r.bbox[0]) * W, (r.bbox[3] - r.bbox[1]) * H);
+            }
           });
           ctx.setLineDash([]);
         }
       };
       img.src = explanation.overlay_url;
     }
-  }
+  }, [
+    showTrajectories, trajectories, overlayOpacity, showUncertaintyMap, heatmaps, 
+    showChangeMap, showAnomalies, alerts, pipelineResult, showExplainability, explanation, resizeCanvas
+  ]);
+
+  // ── Resolve or create overlay canvas inside the OL map container ──────────
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const mapEl: HTMLElement | null = (e as CustomEvent).detail?.mapEl ?? null;
+      if (!mapEl) return;
+      // Create persistent overlay canvas
+      let canvas = mapEl.querySelector<HTMLCanvasElement>('.aether-overlay-canvas');
+      if (!canvas) {
+        canvas = document.createElement('canvas');
+        canvas.className = 'aether-overlay-canvas';
+        canvas.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:200;';
+        mapEl.style.position = 'relative';
+        mapEl.appendChild(canvas);
+      }
+      canvasRef.current = canvas;
+      containerRef.current = mapEl;
+      resizeCanvas();
+    };
+    window.addEventListener('aethergis:mapReady', handler);
+    return () => window.removeEventListener('aethergis:mapReady', handler);
+  }, [resizeCanvas]);
+
+  // ── Fetch trajectories when toggle turns ON ───────────────────────────────
+  useEffect(() => {
+    if (!jobId || !pipelineResult) return;
+    if (!showTrajectories) return;
+    if (trajectories !== null) { renderAll(); return; }
+    setLoadingTrajectories(true);
+    fetchTrajectories(jobId)
+      .then((data) => setTrajectories(data?.trajectories ?? []))
+      .catch(() => setTrajectories([]))
+      .finally(() => setLoadingTrajectories(false));
+  }, [showTrajectories, jobId, pipelineResult, trajectories, setTrajectories, setLoadingTrajectories, renderAll]);
+
+  // ── Fetch alerts when anomaly toggle turns ON ─────────────────────────────
+  useEffect(() => {
+    if (!jobId || !pipelineResult) return;
+    if (!showAnomalies) return;
+    if (alerts !== null) { renderAll(); return; }
+    setLoadingAlerts(true);
+    fetchAlerts(jobId)
+      .then((data) => setAlerts(data?.alerts ?? []))
+      .catch(() => setAlerts([]))
+      .finally(() => setLoadingAlerts(false));
+  }, [showAnomalies, jobId, pipelineResult, alerts, setAlerts, setLoadingAlerts, renderAll]);
+
+  // ── Fetch uncertainty heatmap ─────────────────────────────────────────────
+  useEffect(() => {
+    if (!jobId || !pipelineResult || !showUncertaintyMap) return;
+    if (heatmaps['uncertainty']) { renderAll(); return; }
+    setLoadingHeatmap('uncertainty', true);
+    fetchHeatmap(jobId, 'uncertainty')
+      .then((data) => setHeatmap('uncertainty', data))
+      .catch(() => {})
+      .finally(() => setLoadingHeatmap('uncertainty', false));
+  }, [showUncertaintyMap, jobId, pipelineResult, heatmaps, setHeatmap, setLoadingHeatmap, renderAll]);
+
+  // ── Fetch motion heatmap ──────────────────────────────────────────────────
+  useEffect(() => {
+    if (!jobId || !pipelineResult || !showChangeMap) return;
+    if (heatmaps['motion']) { renderAll(); return; }
+    setLoadingHeatmap('motion', true);
+    fetchHeatmap(jobId, 'motion')
+      .then((data) => setHeatmap('motion', data))
+      .catch(() => {})
+      .finally(() => setLoadingHeatmap('motion', false));
+  }, [showChangeMap, jobId, pipelineResult, heatmaps, setHeatmap, setLoadingHeatmap, renderAll]);
+
+  // ── Fetch explainability for current frame ────────────────────────────────
+  useEffect(() => {
+    if (!jobId || !pipelineResult || !showExplainability) return;
+    const frames = pipelineResult.frames ?? [];
+    const f = frames[currentFrameIndex];
+    if (!f?.is_interpolated) return;
+    fetchExplanation(jobId, currentFrameIndex)
+      .then(setExplanation)
+      .catch(() => { /* ignore */ });
+  }, [showExplainability, jobId, pipelineResult, currentFrameIndex, setExplanation]);
+
+  // ── Re-render canvas whenever relevant state changes ─────────────────────
+  useEffect(() => { renderAll(); }, [renderAll, currentFrameIndex]);
+
 
   // No DOM output — canvas is appended directly to map container
   return null;

@@ -1,31 +1,25 @@
-"""AetherGIS — Security + Rate Limiting Middleware (MODULE 12).
-
-Features:
-  • Optional API key validation (X-API-Key header or ?api_key= query param)
-  • Per-IP rate limiting using Redis sliding window
-  • Request validation (payload size, content-type checks)
-  • Security headers injection
-"""
+"""AetherGIS — Security + Rate Limiting Middleware (MODULE 12)."""
 from __future__ import annotations
 
 import time
-from typing import Callable, Optional
+from typing import Callable
 
-from fastapi import Request, Response, HTTPException
+from fastapi import Request, Response
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from backend.app.config import get_settings
 from backend.app.utils.logging import get_logger
+from backend.app.services.auth_service import verify_session_token
 
 settings = get_settings()
 logger = get_logger(__name__)
 
-# Rate limit config (Defaulting to 600 for frame-heavy playback)
+# Rate limit config
 RATE_LIMIT_REQUESTS = getattr(settings, "rate_limit_requests_per_minute", 600)
-RATE_LIMIT_WINDOW_SECONDS = 60     # 1-minute window
-RATE_LIMIT_BURST = 50              # allowed burst above limit
-MAX_BODY_SIZE_MB = 50              # max request body size
+RATE_LIMIT_WINDOW_SECONDS = 60
+RATE_LIMIT_BURST = 50
+MAX_BODY_SIZE_MB = 50
 
 # Paths that bypass rate limiting
 RATE_LIMIT_EXEMPT_EXACT = {
@@ -42,7 +36,7 @@ RATE_LIMIT_EXEMPT_CONTAINS = {
     "/video/",
 }
 
-# Paths that require API key (if API keys are configured)
+# Paths that require API key or Session
 API_KEY_REQUIRED_PREFIXES = [
     "/api/v1/jobs",
     "/api/v1/pipeline",
@@ -71,7 +65,6 @@ def _get_redis():
 
 
 def _get_client_ip(request: Request) -> str:
-    """Extract real client IP, accounting for proxies."""
     forwarded_for = request.headers.get("X-Forwarded-For")
     if forwarded_for:
         return forwarded_for.split(",")[0].strip()
@@ -79,10 +72,6 @@ def _get_client_ip(request: Request) -> str:
 
 
 def _check_rate_limit_redis(ip: str, r) -> tuple[bool, int, int]:
-    """Sliding window rate limit using Redis.
-
-    Returns: (is_allowed, current_count, retry_after_seconds)
-    """
     key = f"aethergis:ratelimit:{ip}"
     now = time.time()
     window_start = now - RATE_LIMIT_WINDOW_SECONDS
@@ -100,7 +89,6 @@ def _check_rate_limit_redis(ip: str, r) -> tuple[bool, int, int]:
     return allowed, count, retry_after
 
 
-# In-memory fallback rate limiter
 _mem_rate: dict[str, list[float]] = {}
 
 
@@ -110,40 +98,62 @@ def _check_rate_limit_memory(ip: str) -> tuple[bool, int, int]:
     history = _mem_rate.get(ip, [])
     history = [t for t in history if t > window_start]
     history.append(now)
-    _mem_rate[ip] = history[-500:]  # cap list size
+    _mem_rate[ip] = history[-500:]
     count = len(history)
     allowed = count <= RATE_LIMIT_REQUESTS + RATE_LIMIT_BURST
     retry_after = RATE_LIMIT_WINDOW_SECONDS if not allowed else 0
     return allowed, count, retry_after
 
 
-def _check_api_key(request: Request) -> bool:
-    """Validate API key if one is configured in settings."""
-    # If no API key is configured, all requests are allowed
+def _check_auth(request: Request) -> bool:
+    """Validate API key or internal JWT session."""
     configured_keys = settings.api_keys_list
-    if not configured_keys:
+    
+    # 1. Check Session Cookie (JWT)
+    token = request.cookies.get(settings.session_cookie_name)
+    if token:
+        payload = verify_session_token(token)
+        if payload:
+            return True
+
+    # 2. Check API Keys (if configured)
+    if configured_keys:
+        provided = (
+            request.headers.get("X-API-Key")
+            or request.query_params.get("api_key")
+        )
+        if provided in configured_keys:
+            return True
+
+    # 3. Development Mode Bypass (only if no API keys are set)
+    if settings.aether_mode == 'development' and not configured_keys:
         return True
 
-    # Authenticated dashboard users can rely on their session cookie instead of an API key.
-    if request.cookies.get(settings.session_cookie_name):
-        return True
-
-    provided = (
-        request.headers.get("X-API-Key")
-        or request.query_params.get("api_key")
-    )
-    return provided in configured_keys
+    return False
 
 
 class SecurityMiddleware(BaseHTTPMiddleware):
-    """Combined security middleware: rate limiting + API key + security headers."""
+    """Combined security middleware: CSRF + rate limiting + auth + security headers."""
 
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
         path = request.url.path
         ip = _get_client_ip(request)
 
+        # ── CSRF Protection (Double-Submit Header) ─────────────────────────────
+        # Only enforce in production or for authenticated session requests
+        if request.method not in ("GET", "HEAD", "OPTIONS"):
+            # Simple header-based check for AJAX requests
+            # If the session cookie is present, we MUST see the CSRF header
+            if request.cookies.get(settings.session_cookie_name):
+                csrf_header = request.headers.get(settings.csrf_header_name.lower())
+                if not csrf_header:
+                    logger.warning("CSRF attempt blocked", ip=ip, path=path)
+                    return JSONResponse(
+                        status_code=403,
+                        content={"detail": f"CSRF protection: Missing {settings.csrf_header_name} header."}
+                    )
+
         # ── Rate limiting ─────────────────────────────────────────────────────
-        # Only enforce rate limiting in production mode
         if settings.aether_mode == 'production':
             is_exempt = (
                 path in RATE_LIMIT_EXEMPT_EXACT or 
@@ -172,12 +182,12 @@ class SecurityMiddleware(BaseHTTPMiddleware):
                         },
                     )
 
-        # ── API key check ─────────────────────────────────────────────────────
-        requires_key = any(path.startswith(prefix) for prefix in API_KEY_REQUIRED_PREFIXES) and path not in API_KEY_EXEMPT_EXACT
-        if requires_key and not _check_api_key(request):
+        # ── Auth check (API Key or JWT) ───────────────────────────────────────
+        requires_auth = any(path.startswith(prefix) for prefix in API_KEY_REQUIRED_PREFIXES) and path not in API_KEY_EXEMPT_EXACT
+        if requires_auth and not _check_auth(request):
             return JSONResponse(
                 status_code=401,
-                content={"detail": "Missing or invalid API key. Pass X-API-Key header."},
+                content={"detail": "Missing or invalid authentication. Please login."},
             )
 
         # ── Request size validation ───────────────────────────────────────────
@@ -199,9 +209,7 @@ class SecurityMiddleware(BaseHTTPMiddleware):
         response.headers["X-RateLimit-Limit"] = str(RATE_LIMIT_REQUESTS)
 
         if settings.aether_mode == 'production':
-            # 1 year HSTS
             response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains; preload"
-            # Basic CSP - allow own domain and NASA/MOSDAC domains
             response.headers["Content-Security-Policy"] = (
                 "default-src 'self'; "
                 "img-src 'self' data: https://*.nasa.gov https://*.gov.in https://*.jaxa.jp; "

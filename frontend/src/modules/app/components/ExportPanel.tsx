@@ -32,7 +32,16 @@ export default function ExportPanel() {
     }
   };
 
-  const ExportBtn = ({ label, icon, url, filename, disabled, secondary }: any) => (
+  interface ExportBtnProps {
+    label: string;
+    icon: string;
+    url: string;
+    filename: string;
+    disabled?: boolean;
+    secondary?: boolean;
+  }
+
+  const ExportBtn = ({ label, icon, url, filename, disabled, secondary }: ExportBtnProps) => (
     <button
       className={`btn ${secondary ? 'btn-ghost' : 'btn-ghost'}`}
       style={{ 

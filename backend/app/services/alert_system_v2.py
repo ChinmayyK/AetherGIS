@@ -77,7 +77,6 @@ def detect_alerts(
         a, b = frames[i - 1], frames[i]
         ts = (frame_metadata[i]["timestamp"] if frame_metadata and i < len(frame_metadata)
               else now)
-        frame_label = f"frame_{i}"
 
         # Determine approximate geo region from frame index
         region_label = f"Region around frame {i}"

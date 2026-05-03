@@ -27,7 +27,7 @@ export default function PredictionPanel() {
       .then((data) => setPredictions(data?.predictions ?? []))
       .catch(() => setPredictions([]))
       .finally(() => setLoadingPredictions(false));
-  }, [jobId, jobCompleted, enablePrediction]);
+  }, [jobId, jobCompleted, enablePrediction, predictions, setPredictions, setLoadingPredictions]);
 
   if (!enablePrediction) return null;
 

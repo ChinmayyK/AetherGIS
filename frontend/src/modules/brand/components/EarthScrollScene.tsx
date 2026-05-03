@@ -33,7 +33,7 @@ const EarthScrollScene: React.FC<EarthScrollSceneProps> = ({ onEnterDashboard })
   const [firstFrameReady, setFirstFrameReady] = useState(false);
   const [loadFailed, setLoadFailed] = useState(false);
 
-  const profile = useMemo(getProfile, []);
+  const profile = useMemo(() => getProfile(), []);
   const effectiveTotal = Math.floor((TOTAL_FRAMES - 1) / profile.frameStep) + 1;
 
   const { scrollYProgress } = useScroll({

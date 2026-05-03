@@ -60,11 +60,11 @@ function JobPoller() {
     else if (statusData.status === 'RUNNING') setJobStatus('running');
     if (statusData.progress !== undefined) setJobProgress(statusData.progress);
     if (statusData.message !== undefined) setJobMessage(statusData.message ?? null);
-  }, [statusData]);
+  }, [statusData, setJobStatus, setApiError, setJobProgress, setJobMessage]);
 
   useEffect(() => {
     if (resultsData) { setPipelineResult(resultsData); setJobMessage('Pipeline complete'); setApiError(null); }
-  }, [resultsData]);
+  }, [resultsData, setPipelineResult, setJobMessage, setApiError]);
 
   return null;
 }

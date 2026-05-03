@@ -3,20 +3,18 @@
  * Shows on first dashboard load, dismissible and stored in localStorage
  * Theme-aware: Uses CSS variables for automatic light/dark adaptation
  */
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 
 const STORAGE_KEY = 'aethergis:notice-dismissed';
 
 export function ProductNoticeBanner() {
-  const [isVisible, setIsVisible] = useState(false);
-
-  useEffect(() => {
+  const [isVisible, setIsVisible] = useState(() => {
     // Check if user has already dismissed the notice
-    const dismissed = localStorage.getItem(STORAGE_KEY);
-    if (!dismissed) {
-      setIsVisible(true);
+    if (typeof window !== 'undefined') {
+      return !localStorage.getItem(STORAGE_KEY);
     }
-  }, []);
+    return false;
+  });
 
   const handleDismiss = () => {
     localStorage.setItem(STORAGE_KEY, 'true');

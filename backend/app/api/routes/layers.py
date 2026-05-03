@@ -1,7 +1,8 @@
 """AetherGIS - API routes: layers."""
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
+from backend.app.api.deps.identity import resolve_current_user_id
 
 from backend.app.models.schemas import DataSource, LayerCapabilities, LayerInfo
 from backend.app.services.layer_capabilities import get_layer_capabilities_live
@@ -14,7 +15,10 @@ logger = get_logger(__name__)
 
 
 @router.get('', response_model=list[LayerInfo])
-async def list_layers(data_source: DataSource = DataSource.nasa_gibs) -> list[LayerInfo]:
+async def list_layers(
+    data_source: DataSource = DataSource.nasa_gibs,
+    current_user_id: str = Depends(resolve_current_user_id),
+) -> list[LayerInfo]:
     raw = await get_layer_catalog(data_source=data_source.value)
     return [
         LayerInfo(
@@ -39,7 +43,10 @@ async def list_layers(data_source: DataSource = DataSource.nasa_gibs) -> list[La
 
 
 @router.get('/{layer_id}/capabilities', response_model=LayerCapabilities)
-async def get_layer_capabilities(layer_id: str) -> LayerCapabilities:
+async def get_layer_capabilities(
+    layer_id: str,
+    current_user_id: str = Depends(resolve_current_user_id),
+) -> LayerCapabilities:
     if layer_id not in GIBS_LAYERS and layer_id not in BHUVAN_LAYERS and layer_id not in INSAT_LAYERS:
         raise HTTPException(status_code=404, detail=f'Layer {layer_id!r} not found')
 
@@ -77,3 +84,4 @@ async def get_layer_capabilities(layer_id: str) -> LayerCapabilities:
         coverage_note=info.get('coverage_note'),
         default_preset=info.get('default_preset'),
     )
+

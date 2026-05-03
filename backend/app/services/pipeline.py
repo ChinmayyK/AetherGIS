@@ -25,7 +25,7 @@ from backend.app.models.schemas import ConfidenceClass, FrameMetadata, PipelineR
 from backend.app.services.confidence import compute_frame_stability_index, compute_temporal_consistency_score, score_generated_frame
 from backend.app.services.interpolation import get_engine, interpolate_pair_with_segmentation
 from backend.app.services.preprocessing import preprocess_sequence
-from backend.app.services.video_gen import frames_to_video, save_frame_png, write_metadata_sidecar
+from backend.app.services.video_gen import save_frame_optimized, write_metadata_sidecar
 from backend.app.services.wms_client import BHUVAN_LAYERS, GIBS_LAYERS, INSAT_LAYERS, SatelliteFrame, get_wms_client
 from backend.app.utils.logging import get_logger
 
@@ -64,8 +64,10 @@ def _try_import_job_manager():
         )
         return append_audit_event, save_checkpoint, load_checkpoint
     except Exception:
-        noop = lambda *a, **kw: None
-        noop_load = lambda *a, **kw: None
+        def noop(*a, **kw):
+            return None
+        def noop_load(*a, **kw):
+            return None
         return noop, noop, noop_load
 
 
@@ -129,7 +131,6 @@ async def run_pipeline(
                 else:
                     try:
                         from backend.app.services.satellite_providers import fetch_with_fallback
-                        import asyncio
                         pf = await fetch_with_fallback(
                             layer_id, bbox, frame.timestamp, resolution,
                             preferred_source=data_source, job_id=job_id,
@@ -280,7 +281,7 @@ async def run_pipeline(
     frames_dir = export_dir / 'frames'
     frames_dir.mkdir(exist_ok=True)
     for i, frame in enumerate(all_frames):
-        save_frame_png(frame, frames_dir / f'frame_{i:04d}.png', metadata=all_metadata[i])
+        save_frame_optimized(frame, frames_dir / f'frame_{i:04d}.webp', metadata=all_metadata[i])
     write_metadata_sidecar(all_metadata, export_dir / 'metadata.json')
 
     # ── Confidence maps (MODULE 6) ─────────────────────────────────────────

@@ -1,13 +1,13 @@
 {
-  "total_jobs": 28,
-  "completed_jobs": 28,
+  "total_jobs": 33,
+  "completed_jobs": 33,
   "failed_jobs": 0,
-  "total_frames_generated": 1585,
-  "total_interpolated_frames": 1223,
-  "avg_psnr": 22.279602393735356,
-  "avg_ssim": 0.7263882607348461,
-  "avg_confidence": 0.5887151310228232,
+  "total_frames_generated": 1890,
+  "total_interpolated_frames": 1463,
+  "avg_psnr": 23.18584798261121,
+  "avg_ssim": 0.7477460373676953,
+  "avg_confidence": 0.5904249596557287,
   "rejection_rate": 0.0,
   "anomaly_rate": 0.0,
-  "last_updated": "2026-04-29T18:58:05.692432+00:00"
+  "last_updated": "2026-05-03T19:47:00.825430+00:00"
 }

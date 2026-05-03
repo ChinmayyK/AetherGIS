@@ -2,7 +2,7 @@
  * AetherGIS — PlaybackControls (map-view transport bar)
  * Uses the centralized PlaybackEngine + store actions. NO setInterval here.
  */
-import { useStore } from '@app/store/useStore';
+import { useStore, type PlaybackMode } from '@app/store/useStore';
 
 export default function PlaybackControls() {
   const {
@@ -120,7 +120,7 @@ export default function PlaybackControls() {
       <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
         <select
           value={playbackMode}
-          onChange={(e) => { setIsPlaying(false); setPlaybackMode(e.target.value as any); }}
+          onChange={(e) => { setIsPlaying(false); setPlaybackMode(e.target.value as PlaybackMode); }}
           style={{ background: 'var(--bg2)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: 4, fontSize: 11, padding: '4px 8px' }}
         >
           <option value="all">All Frames</option>

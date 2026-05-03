@@ -9,13 +9,12 @@ Implements PRD §6.4:
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from enum import Enum
 
 import cv2
 import numpy as np
 
 from backend.app.config import get_settings
-from backend.app.models.schemas import ConfidenceClass, GapCategory
+from backend.app.models.schemas import ConfidenceClass
 from backend.app.utils.logging import get_logger
 
 logger = get_logger(__name__)

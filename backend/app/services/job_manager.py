@@ -13,17 +13,14 @@ from __future__ import annotations
 
 import json
 import time
-import uuid
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
-from pathlib import Path
 from typing import Any, Optional
 
 import redis as redis_sync
 
 from backend.app.config import get_settings
-from backend.app.models.schemas import JobStatus
 from backend.app.services.persistence import create_run, delete_run as delete_persisted_run, update_run_state
 from backend.app.utils.logging import get_logger
 
@@ -64,6 +61,7 @@ PIPELINE_STAGES = [
 @dataclass
 class JobRecord:
     job_id: str
+    user_id: Optional[str] = None
     status: str = "QUEUED"
     priority: str = "normal"
     progress: float = 0.0
@@ -254,6 +252,7 @@ def create_job(
     eta = _estimate_completion(pos)
     record = JobRecord(
         job_id=job_id,
+        user_id=user_id,
         status="QUEUED",
         priority=priority.value,
         queue_position=pos,

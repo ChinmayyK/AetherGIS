@@ -15,7 +15,6 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass, asdict
 from datetime import datetime, timezone
-from pathlib import Path
 from typing import Optional
 
 import numpy as np
@@ -101,8 +100,6 @@ def query_region(
     time_end: datetime,
 ) -> Optional[RegionStats]:
     """Query a spatial region within a job's exported frames."""
-    from backend.app.services.change_anomaly import ChangeMap
-    import cv2
 
     export_dir = settings.exports_dir / job_id
     if not export_dir.exists():

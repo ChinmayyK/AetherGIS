@@ -1,4 +1,4 @@
-"""AetherGIS API — Advanced Analytics Routes (Modules 1–15).
+"""AetherGIS API â€” Advanced Analytics Routes (Modules 1â€“15).
 
 New endpoints:
   GET  /api/v1/jobs/{job_id}/trajectories          MODULE 1
@@ -19,9 +19,11 @@ import uuid
 from datetime import datetime
 from typing import Any, List, Optional
 
-from fastapi import APIRouter, HTTPException, Query, Path
+from fastapi import APIRouter, Depends, HTTPException, Path
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
+
+from backend.app.api.deps.identity import resolve_current_user_id, require_owned_run
 
 from backend.app.config import get_settings
 from backend.app.utils.logging import get_logger
@@ -31,10 +33,11 @@ settings = get_settings()
 logger = get_logger(__name__)
 
 
-# ── Helpers ────────────────────────────────────────────────────────────────────
+# â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-def _load_frames_for_job(job_id: str) -> List[Any]:
+def _load_frames_for_job(job_id: str, current_user_id: str) -> List[Any]:
     """Load all exported frame PNGs for a job as numpy arrays."""
+    require_owned_run(job_id, current_user_id)
     import numpy as np
     from PIL import Image
 
@@ -56,8 +59,9 @@ def _load_frames_for_job(job_id: str) -> List[Any]:
     return frames
 
 
-def _get_completed_job(job_id: str) -> dict:
+def _get_completed_job(job_id: str, current_user_id: str) -> dict:
     """Retrieve a completed job record or raise 404/202."""
+    require_owned_run(job_id, current_user_id)
     try:
         from backend.app.services.job_store import get_job as _get1
         record = _get1(job_id)
@@ -82,14 +86,14 @@ def _get_completed_job(job_id: str) -> dict:
     return result or {}
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-# MODULE 1 — Trajectory Tracking
-# ══════════════════════════════════════════════════════════════════════════════
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+# MODULE 1 â€” Trajectory Tracking
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 @router.get("/{job_id}/trajectories")
-async def get_trajectories(job_id: str) -> dict:
+async def get_trajectories(job_id: str, current_user_id: str = Depends(resolve_current_user_id)) -> dict:
     """Track cloud-cluster motion across all frames and return path overlays."""
-    frames = _load_frames_for_job(job_id)
+    frames = _load_frames_for_job(job_id, current_user_id)
 
     from backend.app.services.trajectory_tracker import track_trajectories
     trajectories = track_trajectories(frames, job_id)
@@ -102,9 +106,9 @@ async def get_trajectories(job_id: str) -> dict:
     }
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-# MODULE 2 — Multi-Step Future Prediction
-# ══════════════════════════════════════════════════════════════════════════════
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+# MODULE 2 â€” Multi-Step Future Prediction
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 class PredictRequest(BaseModel):
     n_ahead: int = Field(default=3, ge=1, le=6, description="Number of future frames to predict")
@@ -112,11 +116,11 @@ class PredictRequest(BaseModel):
 
 
 @router.post("/{job_id}/predict")
-async def predict_future(job_id: str, body: PredictRequest) -> dict:
+async def predict_future(job_id: str, body: PredictRequest, current_user_id: str = Depends(resolve_current_user_id)) -> dict:
     """Predict future frames by extrapolating optical-flow motion."""
-    frames = _load_frames_for_job(job_id)
+    frames = _load_frames_for_job(job_id, current_user_id)
 
-    result = _get_completed_job(job_id)
+    result = _get_completed_job(job_id, current_user_id)
     frame_meta = result.get("frames", [])
     last_ts = None
     if frame_meta:
@@ -143,13 +147,14 @@ async def predict_future(job_id: str, body: PredictRequest) -> dict:
     }
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-# MODULE 3 — Explainability Engine
-# ══════════════════════════════════════════════════════════════════════════════
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+# MODULE 3 â€” Explainability Engine
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 @router.get("/{job_id}/explain/{frame_idx}")
-async def explain_frame(job_id: str, frame_idx: int) -> dict:
+async def explain_frame(job_id: str, frame_idx: int, current_user_id: str = Depends(resolve_current_user_id)) -> dict:
     """Return explainability overlay for a single interpolated frame."""
+    require_owned_run(job_id, current_user_id)
     import numpy as np
     from PIL import Image
 
@@ -175,16 +180,16 @@ async def explain_frame(job_id: str, frame_idx: int) -> dict:
     return explanation
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-# MODULE 5 — Region Alert System
-# ══════════════════════════════════════════════════════════════════════════════
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+# MODULE 5 â€” Region Alert System
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 @router.get("/{job_id}/alerts")
-async def get_alerts(job_id: str) -> dict:
+async def get_alerts(job_id: str, current_user_id: str = Depends(resolve_current_user_id)) -> dict:
     """Detect critical changes and return an alert list for this job."""
-    frames = _load_frames_for_job(job_id)
+    frames = _load_frames_for_job(job_id, current_user_id)
 
-    result = _get_completed_job(job_id)
+    result = _get_completed_job(job_id, current_user_id)
     frame_meta = result.get("frames", [])
 
     from backend.app.services.alert_system_v2 import detect_alerts
@@ -203,16 +208,16 @@ async def get_alerts(job_id: str) -> dict:
     }
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-# MODULE 6 — Time-Series Analytics
-# ══════════════════════════════════════════════════════════════════════════════
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+# MODULE 6 â€” Time-Series Analytics
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 @router.get("/{job_id}/time_series")
-async def get_time_series(job_id: str) -> dict:
+async def get_time_series(job_id: str, current_user_id: str = Depends(resolve_current_user_id)) -> dict:
     """Compute brightness, motion, and coverage trends over all frames."""
-    frames = _load_frames_for_job(job_id)
+    frames = _load_frames_for_job(job_id, current_user_id)
 
-    result = _get_completed_job(job_id)
+    result = _get_completed_job(job_id, current_user_id)
     frame_meta = result.get("frames", [])
     timestamps = [m.get("timestamp", str(i)) for i, m in enumerate(frame_meta)] if frame_meta else None
 
@@ -222,9 +227,9 @@ async def get_time_series(job_id: str) -> dict:
     return ts_data
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-# MODULE 8 — Scenario Replay Engine
-# ══════════════════════════════════════════════════════════════════════════════
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+# MODULE 8 â€” Scenario Replay Engine
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 class ReplayRequest(BaseModel):
     interpolation_model: str = Field(default="film", pattern="^(film|rife|lk_fallback)$")
@@ -233,12 +238,12 @@ class ReplayRequest(BaseModel):
 
 
 @router.post("/{job_id}/replay")
-async def replay_job(job_id: str, body: ReplayRequest) -> dict:
+async def replay_job(job_id: str, body: ReplayRequest, current_user_id: str = Depends(resolve_current_user_id)) -> dict:
     """
     Re-run a completed job with different parameters.
     Submits a new child job and returns its ID.
     """
-    result = _get_completed_job(job_id)
+    result = _get_completed_job(job_id, current_user_id)
 
     new_job_id = str(uuid.uuid4())
     payload = {
@@ -265,7 +270,7 @@ async def replay_job(job_id: str, body: ReplayRequest) -> dict:
     except Exception as exc:
         logger.warning("Replay via Celery failed; in-process", error=str(exc), job_id=new_job_id)
         try:
-            from backend.app.services.job_store import create_job as _cj2, update_job
+            from backend.app.services.job_store import create_job as _cj2
             from backend.app.api.routes.pipeline import _run_pipeline_in_process
             _cj2(new_job_id, message="Replay queued (in-process)")
             asyncio.create_task(_run_pipeline_in_process(payload))
@@ -281,17 +286,18 @@ async def replay_job(job_id: str, body: ReplayRequest) -> dict:
     }
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-# MODULE 10 — Heatmap Generation
-# ══════════════════════════════════════════════════════════════════════════════
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+# MODULE 10 â€” Heatmap Generation
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 @router.get("/{job_id}/heatmap/{heatmap_type}")
 async def get_heatmap(
     job_id: str,
     heatmap_type: str = Path(..., pattern="^(motion|uncertainty|anomaly)$"),
+    current_user_id: str = Depends(resolve_current_user_id),
 ) -> dict:
     """Return a base64-encoded PNG heatmap overlay."""
-    frames = _load_frames_for_job(job_id)
+    frames = _load_frames_for_job(job_id, current_user_id)
 
     from backend.app.services.heatmap_gen import generate_heatmap  # type: ignore
     data_url = generate_heatmap(frames, heatmap_type)  # type: ignore
@@ -304,14 +310,14 @@ async def get_heatmap(
     }
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-# MODULE 11 — Temporal Consistency Checker
-# ══════════════════════════════════════════════════════════════════════════════
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+# MODULE 11 â€” Temporal Consistency Checker
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 @router.get("/{job_id}/temporal_consistency")
-async def get_temporal_consistency(job_id: str) -> dict:
+async def get_temporal_consistency(job_id: str, current_user_id: str = Depends(resolve_current_user_id)) -> dict:
     """Detect unrealistic transitions (sudden jumps, broken motion)."""
-    frames = _load_frames_for_job(job_id)
+    frames = _load_frames_for_job(job_id, current_user_id)
 
     from backend.app.services.temporal_checker import check_temporal_consistency
     issues = check_temporal_consistency(frames)
@@ -325,14 +331,14 @@ async def get_temporal_consistency(job_id: str) -> dict:
     }
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-# MODULE 14 — Metric Evolution Tracking
-# ══════════════════════════════════════════════════════════════════════════════
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+# MODULE 14 â€” Metric Evolution Tracking
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 @router.get("/{job_id}/metric_evolution")
-async def get_metric_evolution(job_id: str) -> dict:
+async def get_metric_evolution(job_id: str, current_user_id: str = Depends(resolve_current_user_id)) -> dict:
     """Track PSNR / SSIM / confidence stability across the job's frame sequence."""
-    result = _get_completed_job(job_id)
+    result = _get_completed_job(job_id, current_user_id)
     frame_meta = result.get("frames", [])
 
     if not frame_meta:
@@ -344,15 +350,15 @@ async def get_metric_evolution(job_id: str) -> dict:
     return evo
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-# MODULE 15 — Auto-Report Generator
-# ══════════════════════════════════════════════════════════════════════════════
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+# MODULE 15 â€” Auto-Report Generator
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 @router.get("/{job_id}/report", response_class=HTMLResponse)
-async def generate_report(job_id: str) -> HTMLResponse:
+async def generate_report(job_id: str, current_user_id: str = Depends(resolve_current_user_id)) -> HTMLResponse:
     """Generate a full HTML analysis report for a completed job."""
-    result = _get_completed_job(job_id)
-    frames = _load_frames_for_job(job_id)
+    result = _get_completed_job(job_id, current_user_id)
+    frames = _load_frames_for_job(job_id, current_user_id)
 
     frame_meta = result.get("frames", [])
 
@@ -397,3 +403,4 @@ async def generate_report(job_id: str) -> HTMLResponse:
         consistency_issues=consistency_issues,
     )
     return HTMLResponse(content=html, status_code=200)
+

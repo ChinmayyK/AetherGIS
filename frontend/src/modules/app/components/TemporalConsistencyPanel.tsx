@@ -20,7 +20,7 @@ export default function TemporalConsistencyPanel() {
     fetchTemporalConsistency(jobId)
       .then((data) => setConsistencyIssues(data?.issues ?? []))
       .catch(() => setConsistencyIssues([]));
-  }, [jobId, jobCompleted]);
+  }, [jobId, jobCompleted, consistencyIssues, setConsistencyIssues]);
 
   if (!jobCompleted) return null;
 

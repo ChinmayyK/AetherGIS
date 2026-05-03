@@ -3,8 +3,7 @@ from __future__ import annotations
 
 import pytest
 from fastapi.testclient import TestClient
-from unittest.mock import MagicMock, patch, AsyncMock
-import uuid
+from unittest.mock import MagicMock
 from datetime import datetime, timezone
 
 

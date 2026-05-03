@@ -35,7 +35,7 @@ celery_app.conf.update(
 @celery_app.task(bind=True, name="AetherGIS.pipeline.run", max_retries=3)
 def run_pipeline_task(self, job_payload: dict) -> dict:
     """Celery wrapper for the async pipeline with full audit + retry support."""
-    from datetime import datetime, timezone
+    from datetime import datetime
     from backend.app.services.pipeline import run_pipeline
     from backend.app.services.job_manager import (
         update_job, fail_job, complete_job, append_audit_event,

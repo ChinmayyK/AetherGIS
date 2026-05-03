@@ -141,7 +141,6 @@ def _confidence_to_heatmap(confidence: np.ndarray) -> np.ndarray:
     try:
         import matplotlib
         matplotlib.use("Agg")
-        import matplotlib.pyplot as plt
         import matplotlib.cm as cm
         cmap = cm.get_cmap("RdYlGn")
         rgba = cmap(confidence)

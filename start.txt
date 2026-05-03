@@ -1,0 +1,5 @@
+docker compose up -d redis postgres
+
+uv run celery -A backend.app.tasks.celery_app worker --loglevel=info -P solo
+
+uv run uvicorn backend.app.main:app --reload --port 8000

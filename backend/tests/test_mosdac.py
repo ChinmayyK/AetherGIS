@@ -29,7 +29,7 @@ Covers:
 from __future__ import annotations
 
 import io
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
 from xml.etree import ElementTree as ET
 

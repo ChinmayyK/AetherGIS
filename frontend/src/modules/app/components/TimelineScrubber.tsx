@@ -5,7 +5,7 @@
  *
  * NO setInterval here — PlaybackEngine (App.tsx) is the single driver.
  */
-import type { FrameMetadata } from '@app/store/useStore';
+import type { FrameMetadata, PlaybackMode } from '@app/store/useStore';
 import { useStore } from '@app/store/useStore';
 
 /** PRD §11.4 — frame tick type based on confidence class and rejection status */
@@ -161,12 +161,12 @@ export default function TimelineScrubber() {
           <option value={4}>4×</option>
         </select>
 
-        <select
-          className="speed-select"
-          value={playbackMode}
-          onChange={e => { setIsPlaying(false); setPlaybackMode(e.target.value as any); }}
-          style={{ width: 110, marginLeft: 4 }}
-        >
+         <select
+           className="speed-select"
+           value={playbackMode}
+           onChange={e => { setIsPlaying(false); setPlaybackMode(e.target.value as PlaybackMode); }}
+           style={{ width: 110, marginLeft: 4 }}
+         >
           <option value="all">All Frames</option>
           <option value="original">Original Only</option>
           <option value="interpolated">AI Generated</option>

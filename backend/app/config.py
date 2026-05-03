@@ -22,13 +22,11 @@ class Settings(BaseSettings):
     # ── Aether Mode Switch ────────────────────────────────────────────────────
     # 'development' = Local Demo Mode (No Auth, No Queue)
     # 'production'  = Cloud SaaS Mode (Google Auth + Queuing Enabled)
-    # 'development' = Local Demo Mode (No Auth, No Queue)
-    # 'production'  = Cloud SaaS Mode (Google Auth + Queuing Enabled)
     aether_mode: str = 'development'
     dev_preview_enabled: bool = False
     
     # Changed to str to prevent Pydantic from auto-parsing as JSON list
-    cors_origins: str = 'http://localhost:5173,http://localhost:3000'
+    cors_origins: str = 'http://localhost:5173,http://localhost:5174,http://localhost:3000'
 
     @property
     def cors_origins_list(self) -> list[str]:
@@ -45,6 +43,12 @@ class Settings(BaseSettings):
     session_cookie_name: str = 'aether_session'
     session_cookie_secure: bool = False
     session_cookie_samesite: str = 'lax'
+
+    # MODULE 12 — Security & JWT
+    jwt_secret_key: str = 'aether-dev-secret-change-me-in-production'
+    jwt_algorithm: str = 'HS256'
+    session_expiry_hours: int = 24
+    csrf_header_name: str = 'X-Aether-CSRF'
 
     bhuvan_wms_url: str = 'https://bhuvan-ras2.nrsc.gov.in/bhuvan/wms'
     bhuvan_api_key: str = ''

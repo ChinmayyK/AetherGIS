@@ -56,14 +56,14 @@ export default function MetricsPanel() {
     if (!metricEvolution) {
       fetchMetricEvolution(jobId)
         .then(setMetricEvolution)
-        .catch(() => setMetricEvolution({}));
+        .catch(() => setMetricEvolution(null));
     }
     if (!timeSeries) {
       fetchTimeSeries(jobId)
         .then(setTimeSeries)
-        .catch(() => setTimeSeries({}));
+        .catch(() => setTimeSeries(null));
     }
-  }, [jobId, jobCompleted]);
+  }, [jobId, jobCompleted, metricEvolution, setMetricEvolution, timeSeries, setTimeSeries]);
 
   if (!jobCompleted) return null;
 
@@ -142,7 +142,7 @@ export default function MetricsPanel() {
             {ts.coverage_trend?.length > 0 && (
               <div>
                 <div style={{ fontFamily: 'var(--mono)', fontSize: 8, color: 'var(--t4)', marginBottom: 2 }}>
-                  Cloud coverage · mean: <span style={{ color: '#38bdf8' }}>{ts.mean_coverage !== undefined ? `${(ts.mean_coverage * 100).toFixed(1)}%` : '—'}</span>
+                  Cloud coverage · mean: <span style={{ color: '#38bdf8' }}>{ts.mean_coverage !== null ? `${(ts.mean_coverage * 100).toFixed(1)}%` : '—'}</span>
                 </div>
                 <MiniSpark data={ts.coverage_trend} color="#38bdf8" width={230} height={22} />
               </div>

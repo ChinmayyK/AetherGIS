@@ -16,7 +16,7 @@ import hashlib
 import io
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Optional
 
 import httpx
@@ -143,7 +143,7 @@ class HimawariProvider(SatelliteProvider):
     ) -> Optional[ProviderFrame]:
         # Himawari provides pan-Asia/Pacific imagery; map generic layer to Himawari bands
         band = "B03"  # visible
-        date_str = timestamp.strftime("%Y%m%d_%H%M00")
+        timestamp.strftime("%Y%m%d_%H%M00")
         params = {
             "SERVICE": "WMS",
             "VERSION": "1.1.1",

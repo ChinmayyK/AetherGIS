@@ -59,7 +59,7 @@ def _format_datetime(dt: Optional[str]) -> str:
             return parsed.strftime("%Y-%m-%d %H:%M:%S UTC")
         elif isinstance(dt, datetime):
             return dt.strftime("%Y-%m-%d %H:%M:%S UTC")
-    except:
+    except Exception:
         pass
     return str(dt)[:19]
 
@@ -95,7 +95,7 @@ def _calculate_duration(created_at: Optional[Any], completed_at: Optional[Any]) 
             return f"{minutes}m {seconds}s"
         else:
             return f"{seconds}s"
-    except:
+    except Exception:
         return "—"
 
 
@@ -249,7 +249,7 @@ def generate_html_report(
         model_rows += f"<tr><td class='font-mono'>{model}</td><td class='font-mono'>{count}</td><td class='font-mono'>{pct:.1f}%</td></tr>"
     
     # Confidence distribution
-    conf_dist = frame_stats["by_confidence"]
+    frame_stats["by_confidence"]
     
     # Build the comprehensive HTML report
     html = f"""<!DOCTYPE html>

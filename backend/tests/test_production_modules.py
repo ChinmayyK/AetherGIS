@@ -16,13 +16,10 @@ Tests all 15 new production modules:
 """
 from __future__ import annotations
 
-import json
-import tempfile
 import time
 import uuid
-from datetime import datetime, timezone, timedelta
-from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, patch
+from datetime import datetime, timezone
+from unittest.mock import MagicMock, patch
 
 import numpy as np
 import pytest
@@ -55,7 +52,7 @@ class TestJobManager:
         monkeypatch.setattr(
             "backend.app.services.job_manager._get_redis", lambda: None
         )
-        from backend.app.services.job_manager import create_job, get_job, JobPriority
+        from backend.app.services.job_manager import create_job, JobPriority
 
         jid = str(uuid.uuid4())
         record = create_job(jid, priority=JobPriority.high, message="Test job")
@@ -81,7 +78,7 @@ class TestJobManager:
         monkeypatch.setattr(
             "backend.app.services.job_manager._get_redis", lambda: None
         )
-        from backend.app.services.job_manager import create_job, complete_job, get_job, JobPriority
+        from backend.app.services.job_manager import create_job, complete_job, JobPriority
 
         jid = str(uuid.uuid4())
         create_job(jid, priority=JobPriority.normal)
@@ -95,7 +92,7 @@ class TestJobManager:
         monkeypatch.setattr(
             "backend.app.services.job_manager._get_redis", lambda: None
         )
-        from backend.app.services.job_manager import create_job, cancel_job, JobPriority
+        from backend.app.services.job_manager import create_job, cancel_job
 
         jid = str(uuid.uuid4())
         create_job(jid)
@@ -278,7 +275,7 @@ class TestTileCache:
         monkeypatch.setattr(
             "backend.app.services.tile_cache._get_redis", lambda: None
         )
-        from backend.app.services.tile_cache import cache_put, cache_get, cache_invalidate, _mem_cache
+        from backend.app.services.tile_cache import cache_put, cache_invalidate, _mem_cache
 
         _mem_cache.clear()
         frame = np.random.rand(32, 32, 3).astype(np.float32)

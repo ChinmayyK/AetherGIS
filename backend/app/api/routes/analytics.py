@@ -1,14 +1,14 @@
-"""AetherGIS API — Analytics + Streaming Routes.
+"""AetherGIS API â€” Analytics + Streaming Routes.
 
 Covers:
-  MODULE 4  — Cache: GET /api/v1/cache/status, POST /api/v1/cache/clear
-  MODULE 5  — Models: GET /api/v1/models
-  MODULE 6  — Confidence maps: GET /api/v1/jobs/{job_id}/confidence_map/{frame}
-  MODULE 7  — Change maps: GET /api/v1/jobs/{job_id}/change_map/{frame}
-  MODULE 9  — Region query: POST /api/v1/region/query
-  MODULE 10 — Metrics: GET /api/v1/metrics/summary
-  MODULE 11 — Stream: GET /api/v1/jobs/{job_id}/stream (SSE)
-  MODULE 14 — System: GET /api/v1/system/performance
+  MODULE 4  â€” Cache: GET /api/v1/cache/status, POST /api/v1/cache/clear
+  MODULE 5  â€” Models: GET /api/v1/models
+  MODULE 6  â€” Confidence maps: GET /api/v1/jobs/{job_id}/confidence_map/{frame}
+  MODULE 7  â€” Change maps: GET /api/v1/jobs/{job_id}/change_map/{frame}
+  MODULE 9  â€” Region query: POST /api/v1/region/query
+  MODULE 10 â€” Metrics: GET /api/v1/metrics/summary
+  MODULE 11 â€” Stream: GET /api/v1/jobs/{job_id}/stream (SSE)
+  MODULE 14 â€” System: GET /api/v1/system/performance
 """
 from __future__ import annotations
 
@@ -17,9 +17,11 @@ import json
 from datetime import datetime
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException, Request, Query
+from fastapi import APIRouter, Depends, HTTPException, Request, Query
 from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel, Field
+
+from backend.app.api.deps.identity import resolve_current_user_id, require_owned_run
 
 from backend.app.config import get_settings
 from backend.app.utils.logging import get_logger
@@ -27,7 +29,7 @@ from backend.app.utils.logging import get_logger
 settings = get_settings()
 logger = get_logger(__name__)
 
-# ── Sub-routers ───────────────────────────────────────────────────────────────
+# â”€â”€ Sub-routers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 cache_router = APIRouter(prefix="/cache", tags=["Cache"])
 models_router = APIRouter(prefix="/models", tags=["Models"])
@@ -38,28 +40,28 @@ system_router = APIRouter(prefix="/system", tags=["System"])
 stream_router = APIRouter(prefix="/jobs", tags=["Streaming"])
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-# MODULE 4 — Cache
-# ══════════════════════════════════════════════════════════════════════════════
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+# MODULE 4 â€” Cache
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 @cache_router.get("/status")
-async def cache_status() -> dict:
+async def cache_status(current_user_id: str = Depends(resolve_current_user_id)) -> dict:
     """Return cache statistics for L1 (memory) and L2 (Redis) tiers."""
     from backend.app.services.tile_cache import cache_status as _status
     return _status()
 
 
 @cache_router.post("/clear")
-async def cache_clear(layer_id: Optional[str] = None) -> dict:
+async def cache_clear(layer_id: Optional[str] = None, current_user_id: str = Depends(resolve_current_user_id)) -> dict:
     """Clear the tile cache. Optionally target a specific layer."""
     from backend.app.services.tile_cache import cache_invalidate
     cleared = cache_invalidate(layer_id=layer_id)
     return {"cleared_items": cleared, "layer_id": layer_id or "all"}
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-# MODULE 5 — Model Registry
-# ══════════════════════════════════════════════════════════════════════════════
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+# MODULE 5 â€” Model Registry
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 MODEL_REGISTRY = [
     {
@@ -106,7 +108,7 @@ MODEL_REGISTRY = [
 
 
 @models_router.get("")
-async def list_models() -> list[dict]:
+async def list_models(current_user_id: str = Depends(resolve_current_user_id)) -> list[dict]:
     """List all available interpolation models with their load status."""
     from backend.app.services.interpolation import get_engine
     result = []
@@ -123,7 +125,7 @@ async def list_models() -> list[dict]:
 
 
 @models_router.get("/{model_id}")
-async def get_model_info(model_id: str) -> dict:
+async def get_model_info(model_id: str, current_user_id: str = Depends(resolve_current_user_id)) -> dict:
     """Get detailed info for a specific model."""
     for m in MODEL_REGISTRY:
         if m["id"] == model_id:
@@ -131,13 +133,14 @@ async def get_model_info(model_id: str) -> dict:
     raise HTTPException(status_code=404, detail=f"Model '{model_id}' not found")
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-# MODULE 6 — Confidence Maps
-# ══════════════════════════════════════════════════════════════════════════════
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+# MODULE 6 â€” Confidence Maps
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 @analytics_router.get("/{job_id}/confidence_map/{frame_idx}")
-async def get_confidence_map(job_id: str, frame_idx: int) -> FileResponse:
+async def get_confidence_map(job_id: str, frame_idx: int, current_user_id: str = Depends(resolve_current_user_id)) -> FileResponse:
     """Get the pixel-wise confidence/uncertainty map for a frame."""
+    require_owned_run(job_id, current_user_id)
     conf_dir = settings.exports_dir / job_id / "confidence_maps"
     path = conf_dir / f"confidence_map_{frame_idx:04d}.png"
 
@@ -173,13 +176,14 @@ async def get_confidence_map(job_id: str, frame_idx: int) -> FileResponse:
     return FileResponse(str(path), media_type="image/png")
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-# MODULE 7 — Change Maps
-# ══════════════════════════════════════════════════════════════════════════════
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+# MODULE 7 â€” Change Maps
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 @analytics_router.get("/{job_id}/change_map/{frame_idx}")
-async def get_change_map(job_id: str, frame_idx: int) -> FileResponse:
+async def get_change_map(job_id: str, frame_idx: int, current_user_id: str = Depends(resolve_current_user_id)) -> FileResponse:
     """Get the change/difference map between frames {frame_idx-1} and {frame_idx}."""
+    require_owned_run(job_id, current_user_id)
     change_dir = settings.exports_dir / job_id / "change_maps"
     path = change_dir / f"change_map_{frame_idx:04d}.png"
 
@@ -213,9 +217,9 @@ async def get_change_map(job_id: str, frame_idx: int) -> FileResponse:
 
 
 @analytics_router.get("/{job_id}/change_stats")
-async def get_change_stats(job_id: str) -> dict:
+async def get_change_stats(job_id: str, current_user_id: str = Depends(resolve_current_user_id)) -> dict:
     """Get change detection statistics for all frames in a job."""
-    import json
+    require_owned_run(job_id, current_user_id)
 
     frames_dir = settings.exports_dir / job_id / "frames"
     if not frames_dir.exists():
@@ -249,8 +253,9 @@ async def get_change_stats(job_id: str) -> dict:
 
 
 @analytics_router.get("/{job_id}/anomaly_report")
-async def get_anomaly_report(job_id: str) -> dict:
+async def get_anomaly_report(job_id: str, current_user_id: str = Depends(resolve_current_user_id)) -> dict:
     """Get anomaly detection report for all frames in a job."""
+    require_owned_run(job_id, current_user_id)
     frames_dir = settings.exports_dir / job_id / "frames"
     if not frames_dir.exists():
         raise HTTPException(status_code=404, detail=f"Job {job_id} has no exported frames")
@@ -299,9 +304,9 @@ async def get_anomaly_report(job_id: str) -> dict:
         raise HTTPException(status_code=500, detail=str(exc))
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-# MODULE 9 — Region Query
-# ══════════════════════════════════════════════════════════════════════════════
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+# MODULE 9 â€” Region Query
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 class RegionQueryRequest(BaseModel):
     job_id: str
@@ -311,8 +316,9 @@ class RegionQueryRequest(BaseModel):
 
 
 @region_router.post("/query")
-async def query_region(request: RegionQueryRequest) -> dict:
+async def query_region(request: RegionQueryRequest, current_user_id: str = Depends(resolve_current_user_id)) -> dict:
     """Compute spatial statistics for a geo-region within a job's time range."""
+    require_owned_run(request.job_id, current_user_id)
     from backend.app.services.geo_analytics import query_region as _query
     from dataclasses import asdict
 
@@ -332,12 +338,12 @@ async def query_region(request: RegionQueryRequest) -> dict:
     return asdict(result)
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-# MODULE 10 — Metrics Dashboard
-# ══════════════════════════════════════════════════════════════════════════════
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+# MODULE 10 â€” Metrics Dashboard
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 @metrics_router.get("/summary")
-async def metrics_summary() -> dict:
+async def metrics_summary(current_user_id: str = Depends(resolve_current_user_id)) -> dict:
     """Get aggregated metrics across all processed jobs."""
     from backend.app.services.geo_analytics import load_global_metrics
     from dataclasses import asdict
@@ -347,8 +353,9 @@ async def metrics_summary() -> dict:
 
 
 @metrics_router.get("/job/{job_id}")
-async def job_metrics(job_id: str) -> dict:
+async def job_metrics(job_id: str, current_user_id: str = Depends(resolve_current_user_id)) -> dict:
     """Get per-job quality metrics."""
+    require_owned_run(job_id, current_user_id)
     from backend.app.services.job_manager import get_job
 
     record = get_job(job_id)
@@ -366,13 +373,14 @@ async def job_metrics(job_id: str) -> dict:
     }
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-# MODULE 11 — SSE Streaming
-# ══════════════════════════════════════════════════════════════════════════════
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+# MODULE 11 â€” SSE Streaming
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 @stream_router.get("/{job_id}/stream")
-async def stream_frames(job_id: str, request: Request) -> StreamingResponse:
+async def stream_frames(job_id: str, request: Request, current_user_id: str = Depends(resolve_current_user_id)) -> StreamingResponse:
     """Server-Sent Events stream for real-time frame delivery and job progress."""
+    require_owned_run(job_id, current_user_id)
 
     async def _event_generator():
         from backend.app.services.job_manager import get_job, get_job_logs
@@ -436,12 +444,12 @@ async def stream_frames(job_id: str, request: Request) -> StreamingResponse:
     )
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-# MODULE 14 — System Performance
-# ══════════════════════════════════════════════════════════════════════════════
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+# MODULE 14 â€” System Performance
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 @system_router.get("/config")
-async def get_system_config() -> dict:
+async def get_system_config(current_user_id: str = Depends(resolve_current_user_id)) -> dict:
     """Expose system configuration mode for frontend adaptation."""
     return {
         "mode": settings.aether_mode,
@@ -457,7 +465,7 @@ async def get_system_config() -> dict:
 
 
 @system_router.get("/session/status")
-async def get_session_status(session_id: str = Query("")) -> dict:
+async def get_session_status(session_id: str = Query(""), current_user_id: str = Depends(resolve_current_user_id)) -> dict:
     """Check the status of the current user session (granted vs waiting)."""
     from backend.app.services.session_lock import lock_service
     return lock_service.get_status(session_id)
@@ -467,8 +475,9 @@ async def get_session_status(session_id: str = Query("")) -> dict:
 async def post_session_heartbeat(
     session_id: str = Query(""),
     phase: str = Query(None, description="'active' or 'grace'"),
+    current_user_id: str = Depends(resolve_current_user_id),
 ) -> dict:
-    """Extend the session lease. Must be called every ≤30 s to stay alive.
+    """Extend the session lease. Must be called every â‰¤30 s to stay alive.
 
     - In 'active' phase (no pipeline run yet): TTL = 45 s.
     - In 'grace' phase (post-pipeline, exporting): TTL = 300 s.
@@ -478,7 +487,7 @@ async def post_session_heartbeat(
 
 
 @system_router.post("/session/start_grace")
-async def post_session_start_grace(session_id: str = Query("")) -> dict:
+async def post_session_start_grace(session_id: str = Query(""), current_user_id: str = Depends(resolve_current_user_id)) -> dict:
     """Switch session to the post-pipeline grace window (5 min export/download window).
 
     Frontend should call this immediately after pipeline completion.
@@ -489,7 +498,7 @@ async def post_session_start_grace(session_id: str = Query("")) -> dict:
 
 
 @system_router.post("/session/release")
-async def post_session_release(session_id: str = Query("")) -> dict:
+async def post_session_release(session_id: str = Query(""), current_user_id: str = Depends(resolve_current_user_id)) -> dict:
     """Release an active or queued session when a user leaves the dashboard."""
     from backend.app.services.session_lock import lock_service
     released = lock_service.release(session_id)
@@ -497,7 +506,7 @@ async def post_session_release(session_id: str = Query("")) -> dict:
 
 
 @system_router.get("/session/queue")
-async def get_session_queue() -> dict:
+async def get_session_queue(current_user_id: str = Depends(resolve_current_user_id)) -> dict:
     """Return the current queue depth (number of users waiting)."""
     from backend.app.services.session_lock import lock_service
     return {"queue_length": lock_service.queue_length()}
@@ -505,7 +514,7 @@ async def get_session_queue() -> dict:
 
 
 @system_router.get("/performance")
-async def system_performance() -> dict:
+async def system_performance(current_user_id: str = Depends(resolve_current_user_id)) -> dict:
     """Get real-time system performance metrics (GPU, CPU, RAM, job queue)."""
     from backend.app.services.performance import collect_system_performance, to_dict
     perf = collect_system_performance()
@@ -513,7 +522,8 @@ async def system_performance() -> dict:
 
 
 @system_router.get("/providers")
-async def list_satellite_providers() -> list[dict]:
+async def list_satellite_providers(current_user_id: str = Depends(resolve_current_user_id)) -> list[dict]:
     """List all satellite data providers and their availability."""
     from backend.app.services.satellite_providers import list_providers
     return list_providers()
+

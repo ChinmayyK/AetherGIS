@@ -10,7 +10,7 @@ import { fromLonLat } from 'ol/proj';
 
 import VectorLayer from 'ol/layer/Vector';
 import VectorSource from 'ol/source/Vector';
-import Feature from 'ol/Feature';
+import Feature, { type FeatureLike } from 'ol/Feature';
 import { Polygon } from 'ol/geom';
 import { Fill, Stroke, Style, Text } from 'ol/style';
 import { boundingExtent, getCenter } from 'ol/extent';
@@ -26,7 +26,7 @@ import { Eye, EyeOff, Square, Layers, Info, Plus, Minus, Map as MapIcon, Satelli
 
 // ─── Styles & Helpers ─────────────────────────────────────────────────────────
 
-function domainStyle(feature: any) {
+function domainStyle(feature: FeatureLike) {
   return new Style({
     stroke: new Stroke({ color: '#00d1b2', width: 2, lineDash: [4, 4] }),
     fill: new Fill({ color: 'rgba(0, 209, 178, 0.15)' }),
@@ -202,6 +202,7 @@ export default function MapViewer() {
     pipelineResult?.frames.length ?? 0,
     currentFrameIndex,
     playbackSpeed,
+    pipelineResult?.status,
   );
 
   const selectedLayerInfo = layers.find((layer) => layer.layer_id === selectedLayer) ?? null;
@@ -278,7 +279,7 @@ export default function MapViewer() {
       map.setTarget(undefined);
       mapInstance.current = null;
     };
-  }, [layerCapabilities]);
+  }, [layerCapabilities, baseLayerType]);
 
   // Toggle Layer Visibility
   useEffect(() => {

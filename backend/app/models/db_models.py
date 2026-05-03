@@ -34,14 +34,14 @@ class SessionRecord(Base):
     __tablename__ = "sessions"
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True)
-    user_id: Mapped[Optional[str]] = mapped_column(ForeignKey("users.id"), nullable=True, index=True)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
     name: Mapped[str] = mapped_column(String(255))
     provider_default: Mapped[str] = mapped_column(String(64), default="nasa_gibs")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     archived_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
 
-    user: Mapped[Optional[UserRecord]] = relationship(back_populates="sessions")
+    user: Mapped[UserRecord] = relationship(back_populates="sessions")
     runs: Mapped[list["RunRecord"]] = relationship(back_populates="session", cascade="all, delete-orphan")
 
 
@@ -50,7 +50,7 @@ class RunRecord(Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True)
     session_id: Mapped[str] = mapped_column(ForeignKey("sessions.id"), index=True)
-    user_id: Mapped[Optional[str]] = mapped_column(ForeignKey("users.id"), nullable=True, index=True)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
     provider: Mapped[str] = mapped_column(String(64), default="nasa_gibs")
     status: Mapped[str] = mapped_column(String(32), default="QUEUED", index=True)
     priority: Mapped[str] = mapped_column(String(32), default="normal")
@@ -77,7 +77,7 @@ class RunRecord(Base):
     expires_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
 
     session: Mapped[SessionRecord] = relationship(back_populates="runs")
-    user: Mapped[Optional[UserRecord]] = relationship(back_populates="runs")
+    user: Mapped[UserRecord] = relationship(back_populates="runs")
     artifacts: Mapped[list["ArtifactRecord"]] = relationship(back_populates="run", cascade="all, delete-orphan")
 
 

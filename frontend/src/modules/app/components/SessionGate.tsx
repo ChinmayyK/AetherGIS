@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useRef } from 'react';
 import { apiClient, useSystemConfig, type SystemConfig } from '@shared/api/client';
 import { GateLogo, GateTopNav, OrbitRings, StatusBadge } from '@shared/components/GatePrimitives';
 import { useStore } from '@app/store/useStore';
@@ -87,6 +87,7 @@ const SessionGate: React.FC<SessionGateProps> = ({ children }) => {
   const [activeUserHint, setActiveUserHint] = useState('');
   const [pollCount, setPollCount]       = useState(0);
   const [secondsUntilNext, setSecondsUntilNext] = useState(QUEUE_POLL_MS / 1000);
+  const timeoutRef = useRef<number | null>(null);
 
   const goToAccess = () => {
     window.location.assign('/access');
@@ -115,21 +116,23 @@ const SessionGate: React.FC<SessionGateProps> = ({ children }) => {
     if (!resolvedConfig || configLoading) return;
 
     if (!queueEnabled) {
-      setStatus('granted');
+      timeoutRef.current = window.setTimeout(() => {
+        setStatus('granted');
+      }, 0);
       return;
     }
 
     if (forceQueuePreview) {
-      setStatus('waiting');
-      setQueuePos(PREVIEW_QUEUE_POSITION);
-      setEstimatedWait(PREVIEW_QUEUE_POSITION * 5);
-      setActiveUserHint('preview');
+      timeoutRef.current = window.setTimeout(() => {
+        setStatus('waiting');
+        setQueuePos(PREVIEW_QUEUE_POSITION);
+        setEstimatedWait(PREVIEW_QUEUE_POSITION * 5);
+        setActiveUserHint('preview');
+      }, 0);
       return;
     }
 
-    let cancelled    = false;
-    let pollTimer: number | undefined;
-    let countdownTimer: number | undefined;
+    let cancelled = false;
 
     const checkStatus = async () => {
       // Reset countdown display
@@ -146,8 +149,6 @@ const SessionGate: React.FC<SessionGateProps> = ({ children }) => {
           setQueuePos(0);
           setEstimatedWait(0);
           setActiveUserHint('');
-          if (pollTimer) window.clearInterval(pollTimer);
-          if (countdownTimer) window.clearInterval(countdownTimer);
           return;
         }
 
@@ -164,11 +165,11 @@ const SessionGate: React.FC<SessionGateProps> = ({ children }) => {
 
     // Start polling
     checkStatus();
-    pollTimer = window.setInterval(checkStatus, QUEUE_POLL_MS);
+    const pollTimer = window.setInterval(checkStatus, QUEUE_POLL_MS);
 
     // Visual countdown for "next check in Xs"
     let ticksLeft = Math.floor(QUEUE_POLL_MS / 1000);
-    countdownTimer = window.setInterval(() => {
+    const countdownTimer = window.setInterval(() => {
       ticksLeft -= 1;
       setSecondsUntilNext(ticksLeft);
       if (ticksLeft <= 0) ticksLeft = Math.floor(QUEUE_POLL_MS / 1000);
@@ -176,8 +177,9 @@ const SessionGate: React.FC<SessionGateProps> = ({ children }) => {
 
     return () => {
       cancelled = true;
-      if (pollTimer) window.clearInterval(pollTimer);
-      if (countdownTimer) window.clearInterval(countdownTimer);
+      window.clearInterval(pollTimer);
+      window.clearInterval(countdownTimer);
+      if (timeoutRef.current) window.clearTimeout(timeoutRef.current);
     };
   }, [configLoading, forceQueuePreview, queueEnabled, resolvedConfig, sessionId]);
 

@@ -133,7 +133,7 @@ class TestAuthRoutes:
         response = client.get("/api/v1/auth/me")
         
         assert response.status_code == 200
-        data = response.json()
+        response.json()
         # Note: Current implementation has a bug - returns authenticated in dev mode check
         # This test documents the expected behavior
 
@@ -200,7 +200,6 @@ class TestAuthSecurity:
 
     def test_csrf_protection_via_samesite(self, monkeypatch):
         """Cookies should have SameSite attribute for CSRF protection."""
-        from backend.app.api.routes.auth import _cookie_secure
         
         # Default samesite is "lax" which provides CSRF protection
         mock_settings = MagicMock(session_cookie_samesite="lax")

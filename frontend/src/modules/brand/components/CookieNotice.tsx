@@ -1,14 +1,14 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 
 const COOKIE_KEY = 'aethergis_cookie_consent_v1';
 
 const CookieNotice: React.FC = () => {
-  const [visible, setVisible] = useState(false);
-
-  useEffect(() => {
-    const existing = window.localStorage.getItem(COOKIE_KEY);
-    setVisible(!existing);
-  }, []);
+  const [visible, setVisible] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return !window.localStorage.getItem(COOKIE_KEY);
+    }
+    return false;
+  });
 
   const handleChoice = (choice: 'all' | 'essential') => {
     window.localStorage.setItem(COOKIE_KEY, choice);

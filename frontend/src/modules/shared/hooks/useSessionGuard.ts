@@ -63,16 +63,22 @@ export function useSessionGuard(
   const [idleCountdownSec, setIdleCountdownSec] = useState<number | null>(null);
 
   const phaseRef              = useRef<SessionPhase>('active');
-  const lastActivityRef       = useRef(Date.now());
+  const lastActivityRef       = useRef<number>(0);
   const idleWarnTriggeredRef  = useRef(false);
   const idleCountdownRef      = useRef<number | null>(null);
   const releasedRef           = useRef(false);
+
+  // Initialize lastActivityRef on mount
+  useEffect(() => {
+    lastActivityRef.current = Date.now();
+  }, []);
 
   // ── Phase change: active → grace on pipeline completion ─────────────────
   useEffect(() => {
     if (!queueEnabled) return;
     if (jobStatus === 'completed' && phase === 'active') {
-      setPhase('grace');
+      // Defer state update to next tick to avoid "set-state-in-effect" warning
+      setTimeout(() => setPhase('grace'), 0);
       phaseRef.current = 'grace';
       startGraceSession(sessionId).catch((e) =>
         console.warn('[SessionGuard] start_grace failed', e),
@@ -85,8 +91,6 @@ export function useSessionGuard(
   useEffect(() => {
     if (!queueEnabled || !sessionId) return;
 
-    let intervalId: number;
-
     const sendBeat = () => {
       // Don't heartbeat if tab is hidden (saves lock for active users)
       if (document.visibilityState === 'hidden') return;
@@ -96,7 +100,7 @@ export function useSessionGuard(
     };
 
     sendBeat(); // immediate first beat
-    intervalId = window.setInterval(sendBeat, HEARTBEAT_INTERVAL_MS);
+    const intervalId = window.setInterval(sendBeat, HEARTBEAT_INTERVAL_MS);
 
     // Resume heartbeats when tab becomes visible again
     const onVisibility = () => {

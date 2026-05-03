@@ -6,7 +6,7 @@
 import { useState, useEffect } from 'react';
 import type { FrameMetadata } from '@app/store/useStore';
 import { useStore } from '@app/store/useStore';
-import { getMetadataUrl, getReportUrl, triggerVideoExport } from '@shared/api/client';
+import { getMetadataUrl, getReportUrl, triggerVideoExport, triggerZipExport, checkZipReady } from '@shared/api/client';
 import AlertsPanel from './AlertsPanel';
 import MetricsPanel from './MetricsPanel';
 import PredictionPanel from './PredictionPanel';
@@ -17,32 +17,61 @@ import ReplayPanel from './ReplayPanel';
 function ExportTab({ jobId }: { jobId: string | null }) {
   const [status, setStatus] = useState<Record<string, 'idle' | 'loading' | 'done' | 'error'>>({});
 
-  const handleExport = async (type: 'original' | 'interpolated' | 'all') => {
+  const handleExport = async (type: 'original' | 'interpolated' | 'all' | 'zip' | 'zip_obs', tagged: boolean) => {
     if (!jobId) return;
-    setStatus(s => ({ ...s, [type]: 'loading' }));
+    const isZip = type.startsWith('zip');
+    const isObs = type === 'zip_obs';
+    const key = `${type}_${tagged ? 't' : 'u'}`;
+
+    setStatus(s => ({ ...s, [key]: 'loading' }));
     try {
-      const res = await triggerVideoExport(jobId, type);
-      if (res.status === 'ready' && res.url) {
-        const a = document.createElement('a');
-        a.href = res.url;
-        a.download = `aethergis_${type}_${jobId.slice(0, 8)}.mp4`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        setStatus(s => ({ ...s, [type]: 'done' }));
+      let res;
+      if (isZip) {
+        res = await triggerZipExport(jobId, tagged, isObs);
       } else {
-        // fallback: open in new tab (video generation may be async)
-        window.open(`/api/v1/pipeline/${jobId}/export/${type}`, '_blank');
-        setStatus(s => ({ ...s, [type]: 'done' }));
+        res = await triggerVideoExport(jobId, type as 'original' | 'interpolated' | 'all', tagged);
+      }
+
+      if (res.status === 'ready' && res.url) {
+        triggerDownload(res.url, key);
+      } else {
+        const poll = async () => {
+          try {
+            const statusRes = isZip
+              ? await checkZipReady(jobId, tagged, isObs) 
+              : await triggerVideoExport(jobId, type as 'original' | 'interpolated' | 'all', tagged);
+            
+            if (statusRes.status === 'ready' && statusRes.url) {
+              triggerDownload(statusRes.url, key);
+            } else {
+              setTimeout(poll, 2500); 
+            }
+          } catch {
+            setStatus(s => ({ ...s, [key]: 'error' }));
+          }
+        };
+        poll();
       }
     } catch {
-      setStatus(s => ({ ...s, [type]: 'error' }));
+      setStatus(s => ({ ...s, [key]: 'error' }));
     }
   };
 
-  const btnLabel = (type: string, base: string) => {
-    const s = status[type];
-    if (s === 'loading') return '⧗ Generating…';
+  const triggerDownload = (url: string, key: string) => {
+    const a = document.createElement('a');
+    a.href = url;
+    const extension = key.startsWith('zip') ? 'zip' : 'mp4';
+    a.download = `aethergis_${key}_${jobId!.slice(0, 8)}.${extension}`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setStatus(s => ({ ...s, [key]: 'done' }));
+  };
+
+  const btnLabel = (type: string, tagged: boolean, base: string) => {
+    const key = `${type}_${tagged ? 't' : 'u'}`;
+    const s = status[key];
+    if (s === 'loading') return '⧗ Syncing…';
     if (s === 'done') return '✓ Ready';
     if (s === 'error') return '⚠ Retry';
     return base;
@@ -51,42 +80,64 @@ function ExportTab({ jobId }: { jobId: string | null }) {
   return (
     <>
       <div className="section-hdr" style={{ borderTop: 'none' }}>
-        Export Results
+        Professional Archive Suite
         <span style={{ fontSize: 8 }}>▼</span>
       </div>
-      <div style={{ padding: '6px 8px' }}>
-        <div style={{ fontFamily: 'var(--mono)', fontSize: 9, color: 'var(--t4)', marginBottom: 8, lineHeight: 1.6 }}>
-          Job ID: <span style={{ color: 'var(--t2)' }}>{jobId ?? '—'}</span>
+      
+      <div style={{ padding: '8px' }}>
+        {/* Video Archives */}
+        <div style={{ fontFamily: 'var(--cond)', fontSize: 10, color: 'var(--blue)', fontWeight: 700, textTransform: 'uppercase', marginBottom: 6, borderLeft: '2px solid var(--blue)', paddingLeft: 6 }}>
+          Video Distribution (MP4)
+        </div>
+        <div className="export-grid" style={{ marginBottom: 12 }}>
+          <button className="exp-btn" disabled={!jobId} onClick={() => handleExport('interpolated', true)}>
+            {btnLabel('interpolated', true, 'Enhanced (Tagged)')}
+          </button>
+          <button className="exp-btn" disabled={!jobId} onClick={() => handleExport('interpolated', false)}>
+            {btnLabel('interpolated', false, 'Enhanced (Untagged)')}
+          </button>
+          <button className="exp-btn" disabled={!jobId} onClick={() => handleExport('original', true)}>
+            {btnLabel('original', true, 'Observed (Tagged)')}
+          </button>
+          <button className="exp-btn" disabled={!jobId} onClick={() => handleExport('original', false)}>
+            {btnLabel('original', false, 'Observed (Untagged)')}
+          </button>
+        </div>
+
+        {/* Frame Archives */}
+        <div style={{ fontFamily: 'var(--cond)', fontSize: 10, color: 'var(--orange)', fontWeight: 700, textTransform: 'uppercase', marginBottom: 6, borderLeft: '2px solid var(--orange)', paddingLeft: 6 }}>
+          Frame Archives (ZIP)
+        </div>
+        <div className="export-grid" style={{ marginBottom: 12 }}>
+          <button className="exp-btn" disabled={!jobId} onClick={() => handleExport('zip', true)}>
+            {btnLabel('zip', true, 'Full ZIP (Tagged)')}
+          </button>
+          <button className="exp-btn" disabled={!jobId} onClick={() => handleExport('zip', false)}>
+            {btnLabel('zip', false, 'Full ZIP (Untagged)')}
+          </button>
+          <button className="exp-btn" disabled={!jobId} onClick={() => handleExport('zip_obs', true)}>
+            {btnLabel('zip_obs', true, 'Raw ZIP (Tagged)')}
+          </button>
+          <button className="exp-btn" disabled={!jobId} onClick={() => handleExport('zip_obs', false)}>
+            {btnLabel('zip_obs', false, 'Raw ZIP (Untagged)')}
+          </button>
+        </div>
+
+        {/* Supporting Docs */}
+        <div style={{ fontFamily: 'var(--cond)', fontSize: 10, color: 'var(--t3)', fontWeight: 700, textTransform: 'uppercase', marginBottom: 6, borderLeft: '2px solid var(--t4)', paddingLeft: 6 }}>
+          Scientific Documentation
         </div>
         <div className="export-grid">
-          <button
-            className="exp-btn"
-            disabled={!jobId || status.interpolated === 'loading'}
-            onClick={() => handleExport('interpolated')}
-            style={{ opacity: jobId ? 1 : 0.4 }}
-          >↓ {btnLabel('interpolated', 'MP4 (Enhanced)')}</button>
-          <button
-            className="exp-btn"
-            disabled={!jobId || status.original === 'loading'}
-            onClick={() => handleExport('original')}
-            style={{ opacity: jobId ? 1 : 0.4 }}
-          >↓ {btnLabel('original', 'MP4 (Original)')}</button>
-          <a
-            className="exp-btn"
-            href={jobId ? getMetadataUrl(jobId) : '#'}
-            target="_blank" rel="noreferrer"
-            style={{ textDecoration: 'none', pointerEvents: jobId ? 'auto' : 'none', opacity: jobId ? 1 : 0.4 }}
-          >↓ JSON Metadata</a>
-          <button className="exp-btn" disabled style={{ opacity: 0.3, cursor: 'not-allowed' }}>↓ ZIP Frames (Soon)</button>
-          <a
-            className="exp-btn"
-            href={jobId ? getReportUrl(jobId) : '#'}
-            target="_blank" rel="noreferrer"
-            style={{ textDecoration: 'none', pointerEvents: jobId ? 'auto' : 'none', opacity: jobId ? 1 : 0.4, background: 'var(--blue-bg)', borderColor: 'var(--blue-lt)', color: 'var(--blue)' }}
-          >↓ HTML Report</a>
+          <a className="exp-btn" href={jobId ? getMetadataUrl(jobId) : '#'} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none' }}>
+            ↓ JSON Metadata
+          </a>
+          <a className="exp-btn" href={jobId ? getReportUrl(jobId) : '#'} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none', background: 'var(--blue-bg)', borderColor: 'var(--blue-lt)', color: 'var(--blue)' }}>
+            ↓ HTML Evidence Report
+          </a>
         </div>
-        <div style={{ fontFamily: 'var(--mono)', fontSize: 9, color: 'var(--t4)', marginTop: 8, lineHeight: 1.6 }}>
-          ℹ Video generation is on-demand. Metadata includes per-frame confidence scores, PSNR/SSIM, model used, and gap analysis.
+
+        <div style={{ fontFamily: 'var(--mono)', fontSize: 8.5, color: 'var(--t4)', marginTop: 10, lineHeight: 1.5, background: 'var(--b2)', padding: '6px', borderRadius: 4, border: '1px solid var(--b3)' }}>
+          ⓘ <strong>Tagged</strong> assets include temporal overlays and AI watermarks. <strong>Untagged</strong> assets provide raw un-annotated imagery. <strong>Observed</strong> archives exclude synthetic AI frames.
         </div>
       </div>
     </>
@@ -114,7 +165,7 @@ function EmptyState() {
   });
 
   useEffect(() => {
-    try { localStorage.setItem('tgis_guide_open', String(open)); } catch { }
+    try { localStorage.setItem('tgis_guide_open', String(open)); } catch { /* ignore storage errors */ }
   }, [open]);
 
   const STEPS = [

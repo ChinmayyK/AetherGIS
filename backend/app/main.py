@@ -5,15 +5,19 @@ from contextlib import asynccontextmanager
 
 import redis as redis_sync
 import torch
+import json
 from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
+from fastapi.exceptions import RequestValidationError
+from starlette.exceptions import HTTPException as StarletteHTTPException
 from sqlalchemy import text
 
 from backend.app.config import get_settings
 from backend.app.db import SessionLocal
 from backend.app.models.schemas import HealthResponse
 from backend.app.services.persistence import ensure_demo_session, init_database
-from backend.app.services.interpolation import FILMEngine, RIFEEngine, get_engine
+from backend.app.services.interpolation import get_engine
 from backend.app.utils.logging import configure_logging, get_logger
 
 settings = get_settings()
@@ -63,6 +67,9 @@ app.add_middleware(
     allow_headers=['*'],
 )
 
+# ── Compression ───────────────────────────────────────────────────────────────
+app.add_middleware(GZipMiddleware, minimum_size=1000)
+
 # ── Security + Rate Limiting (MODULE 12) ──────────────────────────────────────
 try:
     from backend.app.middleware.security import SecurityMiddleware
@@ -83,7 +90,44 @@ async def add_request_id(request: Request, call_next) -> Response:
     structlog.contextvars.clear_contextvars()
     return response
 
-# ── Routers ────────────────────────────────────────────────────────────────────
+# ── Error Handling ────────────────────────────────────────────────────────────
+@app.exception_handler(StarletteHTTPException)
+async def http_exception_handler(request: Request, exc: StarletteHTTPException):
+    return Response(
+        content=json.dumps({
+            "success": False,
+            "error": str(exc.detail),
+            "status_code": exc.status_code
+        }),
+        status_code=exc.status_code,
+        media_type="application/json"
+    )
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    return Response(
+        content=json.dumps({
+            "success": False,
+            "error": "Validation failed",
+            "details": exc.errors(),
+            "status_code": 422
+        }),
+        status_code=422,
+        media_type="application/json"
+    )
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    logger.error("Unhandled exception", error=str(exc), path=request.url.path)
+    return Response(
+        content=json.dumps({
+            "success": False,
+            "error": "Internal Server Error",
+            "status_code": 500
+        }),
+        status_code=500,
+        media_type="application/json"
+    )
 from backend.app.api.routes import layers, pipeline  # noqa: E402
 
 # Existing routes (backward-compat)

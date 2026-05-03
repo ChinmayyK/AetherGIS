@@ -38,7 +38,7 @@ export default function AlertsPanel() {
       .then((data) => setAlerts(data?.alerts ?? []))
       .catch(() => setAlerts([]))
       .finally(() => setLoadingAlerts(false));
-  }, [jobId, jobCompleted]);
+  }, [jobId, jobCompleted, alerts, setAlerts, setLoadingAlerts]);
 
   const handleAlertClick = (frameIndex: number) => {
     window.dispatchEvent(new CustomEvent('aethergis:seekToFrame', { detail: { frameIndex } }));

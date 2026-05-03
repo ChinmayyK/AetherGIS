@@ -11,14 +11,12 @@ from __future__ import annotations
 
 import json
 import subprocess
-import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
 import cv2
 import numpy as np
-from PIL import Image, ImageDraw, ImageFont
 
 from backend.app.config import get_settings
 from backend.app.models.schemas import ConfidenceClass, FrameMetadata
@@ -239,29 +237,47 @@ def write_metadata_sidecar(
     return output_path
 
 
-def save_frame_png(
+def save_frame_optimized(
     frame: np.ndarray,
     path: Path,
     metadata: Optional[FrameMetadata] = None,
     burn_overlay: bool = False,
+    quality: int = 85,
 ) -> Path:
     """
-    Save an individual frame as PNG.
+    Save an individual frame using WebP for production-grade compression.
+    Falls back to PNG if WebP fails or is not desired.
 
     Args:
         frame:        float32 RGB [H, W, 3] array in [0, 1] range.
-        path:         Destination file path (parent created if missing).
+        path:         Destination file path. If it ends in .png it will save as PNG,
+                      otherwise defaults to .webp for best compression.
         metadata:     Optional frame metadata for overlay.
-        burn_overlay: If True, burn the timestamp/AI watermark into the PNG.
-                      Default is False — keep PNGs raw for clean map preview
-                      and to avoid double-overlay when re-read for video export.
+        burn_overlay: If True, burn the timestamp/AI watermark.
+        quality:      WebP quality (0-100). Default 85 is great for satellite data.
     """
     path.parent.mkdir(parents=True, exist_ok=True)
+    
+    # Ensure path is Path object
+    path = Path(path)
+    
     frame_bgr = cv2.cvtColor(
         (frame * 255).clip(0, 255).astype(np.uint8),
         cv2.COLOR_RGB2BGR,
     )
+    
     if burn_overlay and metadata:
         frame_bgr = _burn_overlay(frame_bgr, metadata, show_overlay=True)
-    cv2.imwrite(str(path), frame_bgr)
+
+    if path.suffix.lower() == '.webp':
+        # WebP optimization: reduces size by ~50-70% compared to PNG
+        encode_param = [int(cv2.IMWRITE_WEBP_QUALITY), quality]
+        success = cv2.imwrite(str(path), frame_bgr, encode_param)
+        if not success:
+            logger.warning("WebP save failed, falling back to PNG", path=str(path))
+            path = path.with_suffix('.png')
+            cv2.imwrite(str(path), frame_bgr)
+    else:
+        cv2.imwrite(str(path), frame_bgr)
+        
     return path

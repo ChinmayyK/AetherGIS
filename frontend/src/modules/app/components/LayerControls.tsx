@@ -8,7 +8,7 @@ import {
   useModels
 } from '@shared/api/client';
 import { useStore } from '@app/store/useStore';
-import type { LayerInfo, PresetRegion } from '@app/store/useStore';
+import type { LayerInfo, PresetRegion, ModelType } from '@app/store/useStore';
 import { applyLayerPreset, chooseRecommendedLayer, getDefaultPresetKey } from '@shared/utils/layerDefaults';
 import AdvancedOverlaysPanel from './AdvancedOverlaysPanel';
 import ConfirmDialog from './ConfirmDialog';
@@ -256,8 +256,9 @@ export default function LayerControls() {
       setJobId(result.job_id);
       setJobStatus('running');
       setJobMessage('Pipeline job accepted. Preparing frames...');
-    } catch (err: any) {
-      const msg = err?.response?.data?.detail || err?.message || 'Failed to submit pipeline job.';
+    } catch (err: unknown) {
+      const error = err as { response?: { data?: { detail?: string } }; message?: string };
+      const msg = error?.response?.data?.detail || error?.message || 'Failed to submit pipeline job.';
       setApiError(msg);
       setJobStatus('failed');
       setJobMessage(msg);
@@ -476,7 +477,7 @@ export default function LayerControls() {
             <div className="section-body">
               <div className="form-row">
                 <span className="form-label">Model</span>
-                <select className="inp" value={interpolationModel} onChange={(e) => setInterpolationModel(e.target.value as any)}>
+                <select className="inp" value={interpolationModel} onChange={(e) => setInterpolationModel(e.target.value as ModelType)}>
                   {models.length > 0 ? (
                     models.map(m => (
                       <option key={m.id} value={m.id}>

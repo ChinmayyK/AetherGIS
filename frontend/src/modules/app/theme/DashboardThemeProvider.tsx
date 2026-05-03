@@ -1,24 +1,15 @@
 import {
-  createContext,
-  useContext,
   useEffect,
   useMemo,
   useState,
   type ReactNode,
 } from 'react';
-
-export type DashboardTheme = 'dark' | 'light';
-
-interface DashboardThemeContextValue {
-  theme: DashboardTheme;
-  isDark: boolean;
-  setTheme: (theme: DashboardTheme) => void;
-  toggleTheme: () => void;
-}
-
-const STORAGE_KEY = 'aethergis-dashboard-theme';
-
-const DashboardThemeContext = createContext<DashboardThemeContextValue | null>(null);
+import {
+  DashboardThemeContext,
+  STORAGE_KEY,
+  type DashboardTheme,
+  type DashboardThemeContextValue,
+} from './DashboardThemeContext';
 
 function getInitialTheme(): DashboardTheme {
   if (typeof window === 'undefined') return 'dark';
@@ -72,12 +63,4 @@ export function DashboardThemeProvider({ children }: { children: ReactNode }) {
       {children}
     </DashboardThemeContext.Provider>
   );
-}
-
-export function useDashboardTheme() {
-  const context = useContext(DashboardThemeContext);
-  if (!context) {
-    throw new Error('useDashboardTheme must be used within DashboardThemeProvider');
-  }
-  return context;
 }

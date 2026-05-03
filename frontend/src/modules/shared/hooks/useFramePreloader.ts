@@ -24,9 +24,9 @@
 import { useEffect, useRef, useCallback } from 'react';
 
 const CACHE_NAME = 'aethergis-frames-v1';
-const AHEAD_BASE = 18;
-const BEHIND_BASE = 8;
-const MAX_CONCURRENT_FETCHES = 4;
+const AHEAD_BASE = 24;
+const BEHIND_BASE = 12;
+const MAX_CONCURRENT_FETCHES = 8;
 const supportsPersistentCache = typeof window !== 'undefined' && 'caches' in window;
 
 function getWindowSize(playbackSpeed: number) {
@@ -42,6 +42,7 @@ export function useFramePreloader(
   totalFrames: number,
   currentFrameIndex: number,
   playbackSpeed: 0.5 | 1 | 2 | 4 = 1,
+  jobStatus?: string,
 ) {
   // Map<frameIndex, blobUrl>
   const cacheRef = useRef(new Map<number, string>());
@@ -133,9 +134,9 @@ export function useFramePreloader(
           const blobUrl = URL.createObjectURL(blob);
           cacheRef.current.set(idx, blobUrl);
         }
-      } catch (err: any) {
-        if (err?.name !== 'AbortError') {
-          console.warn(`[FramePreloader] Failed to prefetch frame ${idx}:`, err?.message);
+      } catch (err: unknown) {
+        if (err instanceof Error && err.name !== 'AbortError') {
+          console.warn(`[FramePreloader] Failed to prefetch frame ${idx}:`, err.message);
         }
       } finally {
         fetchingRef.current.delete(idx);
@@ -145,6 +146,36 @@ export function useFramePreloader(
     },
     [frameRequest],
   );
+
+  /** Background sync: fetch ALL frames into persistent cache when job is COMPLETED */
+  useEffect(() => {
+    if (!jobId || !supportsPersistentCache || jobStatus !== 'completed') return;
+
+    let isCancelled = false;
+    const syncAll = async () => {
+      const cacheStore = await caches.open(CACHE_NAME);
+      // Low priority background sync
+      for (let i = 0; i < totalFrames; i++) {
+        if (isCancelled) break;
+        const request = frameRequest(jobId, i);
+        const match = await cacheStore.match(request);
+        if (!match) {
+          try {
+            // Fetch and put in cache without blocking or storing in memory
+            const res = await fetch(request, { cache: 'force-cache' });
+            if (res.ok) await cacheStore.put(request, res);
+            // Throttle background sync to avoid saturating connection
+            await new Promise(r => setTimeout(r, 100)); 
+          } catch {
+            // Ignore background fetch errors
+          }
+        }
+      }
+    };
+
+    syncAll();
+    return () => { isCancelled = true; };
+  }, [jobId, totalFrames, jobStatus, frameRequest]);
 
   useEffect(() => {
     if (!jobId || totalFrames === 0) return;

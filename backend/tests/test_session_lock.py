@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import pytest
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 
 class TestSessionLockService:
@@ -168,7 +168,7 @@ class TestSessionLockService:
         mock_redis.lrange.return_value = ["user_123"]  # Already in list
         mock_redis.lpos.return_value = 0
         
-        result = lock_service.get_status("user_123")
+        lock_service.get_status("user_123")
         
         mock_redis.rpush.assert_not_called()  # Should not add duplicate
 

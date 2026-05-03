@@ -14,7 +14,7 @@ import {
   useSystemConfig,
 } from '@shared/api/client';
 import ConfirmDialog from './ConfirmDialog';
-import { useDashboardTheme } from '@app/theme/DashboardThemeProvider';
+import { useDashboardTheme } from '@app/theme/useDashboardTheme';
 
 /* ─── Types ──────────────────────────────────────────────────────────────── */
 interface MenuItem {

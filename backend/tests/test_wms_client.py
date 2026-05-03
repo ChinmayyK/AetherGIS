@@ -3,13 +3,13 @@ from __future__ import annotations
 
 import io
 from datetime import datetime, timezone
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import numpy as np
 import pytest
 from PIL import Image
 
-from backend.app.services.wms_client import NASAGIBSClient, SatelliteFrame, WMSClientError
+from backend.app.services.wms_client import NASAGIBSClient
 
 
 def make_png_bytes(w: int = 64, h: int = 64, fill: tuple = (100, 150, 200)) -> bytes:

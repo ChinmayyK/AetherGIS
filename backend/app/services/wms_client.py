@@ -724,7 +724,7 @@ class NASAGIBSClient:
 
     def _cache_key(self, params: dict) -> str:
         canonical = "&".join(f"{k}={v}" for k, v in sorted(params.items()))
-        return hashlib.md5(canonical.encode()).hexdigest()
+        return hashlib.md5(canonical.encode(), usedforsecurity=False).hexdigest()
 
     async def _rate_limit(self) -> None:
         """Enforce minimum 1-second delay between requests (Rule DI-04)."""
@@ -839,7 +839,7 @@ class NASAGIBSClient:
         logger.info("Fetching WMS frame", layer=layer_id, time=timestamp.isoformat())
         raw = await self._fetch_with_retry(params)
         arr = self._decode_image(raw)
-        img_hash = hashlib.md5(raw).hexdigest()
+        img_hash = hashlib.md5(raw, usedforsecurity=False).hexdigest()
 
         is_valid, flags = self._validate_frame(arr, layer_id)
         if not is_valid:

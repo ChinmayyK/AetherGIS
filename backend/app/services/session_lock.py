@@ -28,7 +28,6 @@ DESIGN PRINCIPLES
 """
 from __future__ import annotations
 
-import time
 from typing import Optional, Dict, Any
 import redis as redis_sync
 from backend.app.config import get_settings

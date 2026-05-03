@@ -109,6 +109,22 @@ export interface ExplanationResult {
   overlay_url: string | null;
 }
 export interface HeatmapData { type: string; data_url: string; total_frames: number; }
+export interface MetricEvolution {
+  psnr_trend: { value: number }[];
+  avg_psnr: number;
+  ssim_trend: { value: number }[];
+  avg_ssim: number;
+  confidence_trend: { value: number }[];
+  confidence_stability: number;
+}
+export interface TimeSeriesData {
+  brightness_trend: { value: number }[];
+  mean_brightness: number;
+  motion_trend: { value: number }[];
+  change_rate: number;
+  coverage_trend: { value: number }[];
+  mean_coverage: number | null;
+}
 
 interface TGISState {
   sessionId: string;
@@ -154,8 +170,8 @@ interface TGISState {
   explanation: ExplanationResult | null;
   heatmaps: Record<string, HeatmapData>;          // keyed by type
   consistencyIssues: ConsistencyIssue[] | null;
-  metricEvolution: Record<string, any> | null;
-  timeSeries: Record<string, any> | null;
+  metricEvolution: MetricEvolution | null;
+  timeSeries: TimeSeriesData | null;
   // ── Loading states ────────────────────────────────────────────────────────
   loadingTrajectories: boolean;
   loadingAlerts: boolean;
@@ -204,8 +220,8 @@ interface TGISState {
   setExplanation: (v: ExplanationResult | null) => void;
   setHeatmap: (type: string, data: HeatmapData) => void;
   setConsistencyIssues: (v: ConsistencyIssue[] | null) => void;
-  setMetricEvolution: (v: Record<string, any> | null) => void;
-  setTimeSeries: (v: Record<string, any> | null) => void;
+  setMetricEvolution: (v: MetricEvolution | null) => void;
+  setTimeSeries: (v: TimeSeriesData | null) => void;
   setLoadingTrajectories: (v: boolean) => void;
   setLoadingAlerts: (v: boolean) => void;
   setLoadingPredictions: (v: boolean) => void;
@@ -354,18 +370,27 @@ export const useStore = create<TGISState>()(
           
           for (const s of sessions) {
             const runs = await fetchSessionRuns(s.session_id);
-            const mappedRuns: PipelineResult[] = runs.map((r: any) => ({
+            const mappedRuns: PipelineResult[] = (runs as { 
+              job_id: string; 
+              status: string; 
+              layer_id: string; 
+              provider: string; 
+              bbox: number[]; 
+              time_start: string; 
+              time_end: string;
+              result?: { frames?: FrameMetadata[]; metrics?: QualityMetrics };
+            }[]).map((r) => ({
               job_id: r.job_id,
               session_id: s.session_id,
-              status: r.status.toUpperCase() as any,
+              status: r.status.toUpperCase() as PipelineResult['status'],
               layer_id: r.layer_id,
               data_source: r.provider,
               bbox: r.bbox as [number, number, number, number],
               time_start: r.time_start,
               time_end: r.time_end,
               session_name: s.name,
-              frames: (r.result as any)?.frames ?? [],
-              metrics: (r.result as any)?.metrics ?? undefined,
+              frames: r.result?.frames ?? [],
+              metrics: r.result?.metrics ?? undefined,
             }));
             allHistory = [...allHistory, ...mappedRuns];
           }

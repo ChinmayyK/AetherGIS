@@ -10,7 +10,10 @@ export const apiClient = axios.create({
   baseURL: API_BASE,
   timeout: 30_000,
   withCredentials: true,
-  headers: { 'Content-Type': 'application/json' },
+  headers: { 
+    'Content-Type': 'application/json',
+    'X-Aether-CSRF': 'true' // Mandatory for non-GET requests in hardened mode
+  },
 });
 
 export interface LayerCapabilities {
@@ -128,16 +131,28 @@ export const cancelPipeline = async (jobId: string): Promise<{ status: string }>
 export const triggerVideoExport = async (
   jobId: string,
   videoType: 'original' | 'interpolated' | 'all',
+  tagged: boolean = true,
 ): Promise<{ status: 'ready' | 'generating'; url?: string }> => {
-  const { data } = await apiClient.post(`/pipeline/${jobId}/export/${videoType}`);
+  const { data } = await apiClient.post(`/pipeline/${jobId}/export/${videoType}?tagged=${tagged}`);
   return data;
 };
 
 export const checkVideoReady = async (
   jobId: string,
   videoType: 'original' | 'interpolated' | 'all',
-): Promise<{ status: 'ready' | 'not_generated'; url?: string }> => {
-  const { data } = await apiClient.get(`/pipeline/${jobId}/export/${videoType}/status`);
+  tagged: boolean = true,
+): Promise<{ status: 'ready' | 'not_generated' | 'generating'; url?: string }> => {
+  const { data } = await apiClient.get(`/pipeline/${jobId}/export/${videoType}/status?tagged=${tagged}`);
+  return data;
+};
+
+export const triggerZipExport = async (jobId: string, tagged: boolean = false, originalOnly: boolean = false): Promise<{ status: 'ready' | 'generating'; url?: string }> => {
+  const { data } = await apiClient.post(`/pipeline/${jobId}/zip?tagged=${tagged}&original_only=${originalOnly}`);
+  return data;
+};
+
+export const checkZipReady = async (jobId: string, tagged: boolean = false, originalOnly: boolean = false): Promise<{ status: 'ready' | 'generating'; url?: string; size_bytes?: number }> => {
+  const { data } = await apiClient.get(`/pipeline/${jobId}/zip/status?tagged=${tagged}&original_only=${originalOnly}`);
   return data;
 };
 
@@ -181,7 +196,13 @@ export const fetchSessionRuns = async (sessionId: string): Promise<RunSummary[]>
   return data;
 };
 
-export const fetchModels = async (): Promise<any[]> => {
+export interface ModelInfo {
+  id: string;
+  name: string;
+  description?: string;
+}
+
+export const fetchModels = async (): Promise<ModelInfo[]> => {
   const { data } = await apiClient.get('/models');
   return data;
 };
@@ -214,7 +235,13 @@ export const fetchSystemConfig = async (): Promise<SystemConfig> => {
   return data;
 };
 
-export const fetchSatelliteProviders = async (): Promise<any[]> => {
+export interface SatelliteProvider {
+  id: string;
+  name: string;
+  description?: string;
+}
+
+export const fetchSatelliteProviders = async (): Promise<SatelliteProvider[]> => {
   const { data } = await apiClient.get('/system/providers');
   return data;
 };

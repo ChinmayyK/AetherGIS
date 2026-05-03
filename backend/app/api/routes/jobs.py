@@ -1,12 +1,12 @@
-"""AetherGIS API — Jobs Router (MODULE 1 + 2 + 15).
+"""AetherGIS API â€” Jobs Router (MODULE 1 + 2 + 15).
 
 Endpoints:
-  POST   /api/v1/jobs                          — submit new job
-  GET    /api/v1/jobs/{job_id}/status          — poll status + ETA + queue pos
-  GET    /api/v1/jobs/{job_id}/logs            — stage log stream
-  POST   /api/v1/jobs/{job_id}/cancel          — cancel job
-  GET    /api/v1/jobs/{job_id}/reproduce       — get reproducibility manifest
-  GET    /api/v1/jobs/{job_id}/audit           — full audit trail
+  POST   /api/v1/jobs                          â€” submit new job
+  GET    /api/v1/jobs/{job_id}/status          â€” poll status + ETA + queue pos
+  GET    /api/v1/jobs/{job_id}/logs            â€” stage log stream
+  POST   /api/v1/jobs/{job_id}/cancel          â€” cancel job
+  GET    /api/v1/jobs/{job_id}/reproduce       â€” get reproducibility manifest
+  GET    /api/v1/jobs/{job_id}/audit           â€” full audit trail
 """
 from __future__ import annotations
 
@@ -45,7 +45,7 @@ logger = get_logger(__name__)
 settings = get_settings()
 
 
-# ── Request/Response schemas ──────────────────────────────────────────────────
+# â”€â”€ Request/Response schemas â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class JobSubmitRequest(BaseModel):
     layer_id: str = Field(..., examples=["GOES-East_ABI_Band2_Red_Visible_1km"])
@@ -86,7 +86,7 @@ class JobLogEntry(BaseModel):
     stage: str
 
 
-# ── Helpers ────────────────────────────────────────────────────────────────────
+# â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 def _build_payload(job_id: str, req: JobSubmitRequest) -> dict[str, Any]:
     return {
@@ -108,10 +108,10 @@ def _build_payload(job_id: str, req: JobSubmitRequest) -> dict[str, Any]:
 
 def _build_manifest(job_id: str, req: JobSubmitRequest) -> dict:
     """Build reproducibility manifest capturing all job parameters."""
-    import hashlib, json
+    import hashlib
     from backend.app.services.interpolation import get_engine
 
-    engine = get_engine(req.interpolation_model.value)
+    get_engine(req.interpolation_model.value)
     # Hash model weights file if it exists
     model_path = settings.rife_model_path if req.interpolation_model.value == "rife" else settings.film_model_path
     weight_hash = None
@@ -206,7 +206,7 @@ async def _run_job_async(payload: dict, job_id: str) -> None:
         append_audit_event(job_id, "pipeline_failed", {"error": str(exc)})
 
 
-# ── Endpoints ──────────────────────────────────────────────────────────────────
+# â”€â”€ Endpoints â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 @router.post("", response_model=dict, status_code=202)
 async def submit_job(
@@ -242,7 +242,7 @@ async def submit_job(
         )
         logger.info("Job queued via Celery", job_id=job_id, priority=request.priority)
     except Exception as exc:
-        logger.warning("Celery unavailable — in-process execution", error=str(exc), job_id=job_id)
+        logger.warning("Celery unavailable â€” in-process execution", error=str(exc), job_id=job_id)
         update_job(job_id, message="Running in-process (Celery unavailable)")
         asyncio.create_task(_run_job_async(payload, job_id))
 
@@ -306,7 +306,7 @@ async def get_job_status(job_id: str, current_user_id: str = Depends(resolve_cur
 @router.get("/{job_id}/logs", response_model=list[JobLogEntry])
 async def get_job_logs_endpoint(
     job_id: str,
-    since: Optional[str] = Query(None, description="ISO timestamp — return only logs after this time"),
+    since: Optional[str] = Query(None, description="ISO timestamp â€” return only logs after this time"),
     current_user_id: str = Depends(resolve_current_user_id),
 ) -> list[dict]:
     """Get structured log stream for a job."""
@@ -365,3 +365,4 @@ async def get_audit_trail(job_id: str, current_user_id: str = Depends(resolve_cu
     if not trail:
         raise HTTPException(status_code=404, detail=f"No audit trail found for job {job_id}")
     return trail
+
