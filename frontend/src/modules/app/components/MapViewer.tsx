@@ -3,7 +3,6 @@ import Map from 'ol/Map';
 import View from 'ol/View';
 import TileLayer from 'ol/layer/Tile';
 import ImageLayer from 'ol/layer/Image';
-import OSM from 'ol/source/OSM';
 import XYZ from 'ol/source/XYZ';
 import Static from 'ol/source/ImageStatic';
 import { fromLonLat } from 'ol/proj';
