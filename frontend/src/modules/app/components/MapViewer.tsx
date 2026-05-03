@@ -234,9 +234,8 @@ export default function MapViewer() {
             attributions: 'NASA GIBS / Blue Marble'
           })
         : new XYZ({
-            url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-            attributions: '© OpenStreetMap contributors',
-            crossOrigin: 'anonymous'
+            url: 'https://{a-c}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+            attributions: '© OpenStreetMap contributors'
           })
     });
     baseLayerRef.current = baseLayer;
@@ -308,9 +307,8 @@ export default function MapViewer() {
           attributions: 'NASA GIBS / Blue Marble'
         })
         : new XYZ({
-            url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-            attributions: '© OpenStreetMap contributors',
-            crossOrigin: 'anonymous'
+            url: 'https://{a-c}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+            attributions: '© OpenStreetMap contributors'
           });
     
     baseLayer.setSource(newSource);
