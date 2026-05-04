@@ -57,7 +57,8 @@ echo " ✅"
 
 # Check Redis
 echo -n "Redis:    "
-until sudo docker compose exec redis redis-cli -a Aether_Redis_Secure_2026_! ping > /dev/null 2>&1; do
+# Use the same password as defined in docker-compose/env
+until sudo docker compose exec redis redis-cli -a ${REDIS_PASSWORD:-aetherredispass} ping > /dev/null 2>&1; do
   echo -n "."
   sleep 2
 done
