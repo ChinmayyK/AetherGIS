@@ -6,6 +6,8 @@ COPY package.json package-lock.json ./
 RUN npm ci
 
 COPY . .
+ARG BUILD_ID=unknown
+RUN echo "Build ID: $BUILD_ID"
 
 ARG VITE_API_URL=/api/v1
 ENV VITE_API_URL=$VITE_API_URL

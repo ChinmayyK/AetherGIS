@@ -178,7 +178,7 @@ function StatusBar() {
 
   return (
     <div className="statusbar">
-      <div className="sb-seg">AetherGIS 2.0.0</div>
+      <div className="sb-seg">AetherGIS 2.0.5</div>
       {bbox && <div className="sb-seg">AOI Active</div>}
       {pipelineResult?.frames.length ? <div className="sb-seg">Frames: {pipelineResult.frames.length}</div> : null}
       {apiError && <div className="sb-seg text-red">⚠ Error</div>}

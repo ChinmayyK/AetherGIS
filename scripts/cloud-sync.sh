@@ -34,7 +34,7 @@ echo -e "${GREEN}🏗️ [3/6] Rebuilding AI Engine (Backend + Worker)...${NC}"
 sudo docker compose build --no-cache backend worker
 
 echo -e "${GREEN}🏗️ [4/6] Rebuilding Frontend (Nginx/Vite)...${NC}"
-sudo docker compose build --no-cache frontend
+sudo docker compose build --no-cache --build-arg BUILD_ID=$(date +%s) frontend
 
 # 5. CLEAN UP (Prune build cache to save disk space)
 echo -e "${GREEN}🧹 Cleaning up build artifacts...${NC}"
