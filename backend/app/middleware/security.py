@@ -16,9 +16,10 @@ settings = get_settings()
 logger = get_logger(__name__)
 
 # Rate limit config
-RATE_LIMIT_REQUESTS = getattr(settings, "rate_limit_requests_per_minute", 1000)
+# Rate limit config - RELAXED FOR DEBUGGING
+RATE_LIMIT_REQUESTS = 100000 
 RATE_LIMIT_WINDOW_SECONDS = 60
-RATE_LIMIT_BURST = 200 # Allow more concurrent telemetry requests
+RATE_LIMIT_BURST = 5000
 MAX_BODY_SIZE_MB = 50
 
 # Paths that bypass rate limiting
@@ -170,7 +171,7 @@ class SecurityMiddleware(BaseHTTPMiddleware):
                     allowed, count, retry_after = _check_rate_limit_memory(ip)
 
                 if not allowed:
-                    logger.warning("Rate limit exceeded", ip=ip, count=count, path=path)
+                    logger.error("RATE LIMIT BLOCKED", ip=ip, count=count, path=path, limit=RATE_LIMIT_REQUESTS)
                     return JSONResponse(
                         status_code=429,
                         content={

@@ -196,11 +196,12 @@ def get_active_job_count() -> int:
 
 def can_accept_new_job() -> tuple[bool, str | None]:
     active = get_active_job_count()
-    if active >= settings.max_active_runs:
-        return False, "Demo server is busy with another active run. Please wait for it to finish."
+    # Increase limits for production stability
+    if active >= 10: 
+        return False, "Too many active runs. Please wait a moment."
     queued = get_queue_depth()
-    if queued >= settings.max_queued_runs:
-        return False, "The queue is full right now. Please try again after the current run completes."
+    if queued >= 20:
+        return False, "The queue is full right now."
     return True, None
 
 
